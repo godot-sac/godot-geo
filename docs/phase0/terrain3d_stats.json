@@ -1,0 +1,30 @@
+{
+  "city": {
+    "draw_calls": 106.0,
+    "frame_ms": 0.71,
+    "primitives": 630624.0
+  },
+  "load_ms": 756.0,
+  "low_valley": {
+    "draw_calls": 134.0,
+    "frame_ms": 0.66,
+    "primitives": 925448.0
+  },
+  "oblique_hills": {
+    "draw_calls": 96.0,
+    "frame_ms": 0.61,
+    "primitives": 443408.0
+  },
+  "overview": {
+    "draw_calls": 34.0,
+    "frame_ms": 0.75,
+    "primitives": 237664.0
+  },
+  "texture_mem_mb": 335.5,
+  "top_down": {
+    "draw_calls": 151.0,
+    "frame_ms": 0.84,
+    "primitives": 1063568.0
+  },
+  "video_mem_mb": 372.9
+}

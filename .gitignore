@@ -17,3 +17,7 @@ __pycache__/
 # Downloaded source data and generated terrain packages
 tools/.cache/
 terrain/
+
+# Phase 0: Terrain3D is only being evaluated (copy from its release zip); screenshots are regenerated
+addons/terrain_3d/
+prototypes/phase0/shots_tmp/
