@@ -1,0 +1,19 @@
+# Godot
+.godot/
+*.import
+export_presets.cfg
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python (tools)
+.venv/
+__pycache__/
+*.pyc
+
+# Downloaded source data and generated terrain packages
+tools/.cache/
+terrain/
