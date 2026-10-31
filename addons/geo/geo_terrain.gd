@@ -1,0 +1,230 @@
+@tool
+@icon("res://addons/geo/icons/geo_terrain.svg")
+## Real-world terrain from a godot-geo package (tools/build_terrain.py): draws it, answers height queries and keeps a
+## collision patch under a target. Positions are in the package frame: the local ENU plane at the package origin,
+## +X east, +Y up, -Z north, the same frame as godot-dis DisGeoOrigin. Keep this node unrotated and unscaled.
+##
+## If the scene has a DisGeoOrigin (group "dis_geo_origin") at the same latitude / longitude but another height, the
+## terrain is shifted vertically to match; a different latitude / longitude only raises a warning.
+class_name GeoTerrain
+extends Node3D
+
+signal loaded
+
+enum Backend { CDLOD }
+
+## Package directory (contains terrain.json).
+@export_dir var package_path := "":
+	set(value):
+		package_path = value
+		if is_inside_tree():
+			load_package()
+@export var backend := Backend.CDLOD
+## Level 0 detail range in patch sizes (CDLOD); larger is sharper and slower. Minimum 3.5.
+@export_range(3.5, 16.0, 0.5) var lod_distance := 4.0
+@export var cast_shadows := true:
+	set(value):
+		cast_shadows = value
+		if _backend:
+			_backend.set_cast_shadows(_shadow_setting())
+@export_group("Collision")
+@export var collision_enabled := true
+## Edge length of the square collision patch kept around the target, in metres.
+@export var collision_size := 2000.0
+## Node the collision patch follows; the active camera if empty.
+@export var collision_target: NodePath
+@export_flags_3d_physics var collision_layer := 1
+@export_group("")
+## Check SHA-256 of the package files on load (slow for large packages).
+@export var verify_package := false
+
+var package: GeoTerrainPackage
+## Vertical shift applied to the package so its heights match the scene origin's height (see class docs).
+var origin_offset := 0.0
+## Empty when the scene origin matches the package origin (or there is none); otherwise why not.
+var origin_warning := ""
+
+var _backend: GeoTerrainBackend
+var _body: StaticBody3D
+var _shape: HeightMapShape3D
+var _collision_center := Vector2(INF, INF)
+
+
+func _ready() -> void:
+	if not package_path.is_empty() and package == null:
+		load_package()
+
+
+func _exit_tree() -> void:
+	_clear()
+
+
+## Loads `package_path` and builds the terrain. Returns OK or an error (also pushed as an engine error).
+func load_package() -> Error:
+	_clear()
+	if package_path.is_empty():
+		return ERR_INVALID_PARAMETER
+	var pkg := GeoTerrainPackage.open(package_path, verify_package)
+	if not pkg.ok():
+		push_error("GeoTerrain: " + pkg.error)
+		return ERR_FILE_NOT_FOUND if pkg.error.begins_with("no terrain package") else ERR_INVALID_DATA
+	package = pkg
+	_align_to_scene_origin()
+	match backend:
+		_:
+			var b := GeoCdlodBackend.new()
+			b.lod_distance = lod_distance
+			_backend = b
+	_backend.name = "Backend"
+	_backend.position.y = origin_offset
+	add_child(_backend, false, INTERNAL_MODE_FRONT)
+	_backend.build(package)
+	_backend.set_cast_shadows(_shadow_setting())
+	if collision_enabled and not Engine.is_editor_hint():
+		_body = StaticBody3D.new()
+		_body.name = "Collision"
+		_body.collision_layer = collision_layer
+		var cs := CollisionShape3D.new()
+		_shape = HeightMapShape3D.new()
+		cs.shape = _shape
+		_body.add_child(cs)
+		add_child(_body, false, INTERNAL_MODE_FRONT)
+	loaded.emit()
+	_update(true)
+	return OK
+
+
+func is_loaded() -> bool:
+	return package != null
+
+
+func _clear() -> void:
+	for n: Node in [_backend, _body]:
+		if n:
+			remove_child(n)
+			n.queue_free()
+	_backend = null
+	_body = null
+	_shape = null
+	package = null
+	origin_offset = 0.0
+	origin_warning = ""
+	_collision_center = Vector2(INF, INF)
+
+
+func _process(_delta: float) -> void:
+	_update(false)
+
+
+func _update(force: bool) -> void:
+	if _backend == null:
+		return
+	var cam := _camera()
+	if cam:
+		_backend.update_view(_backend.to_local(cam.global_position))
+	if _body:
+		var target := get_node_or_null(collision_target) as Node3D if not collision_target.is_empty() else cam
+		if target:
+			_update_collision(to_local(target.global_position), force)
+
+
+func _camera() -> Camera3D:
+	if Engine.is_editor_hint():
+		var ei := Engine.get_singleton(&"EditorInterface")
+		if ei:
+			var vp: SubViewport = ei.call(&"get_editor_viewport_3d", 0)
+			return vp.get_camera_3d() if vp else null
+		return null
+	return get_viewport().get_camera_3d() if get_viewport() else null
+
+
+## Terrain surface height at global x, z (the surface drawn at full detail). NAN outside the package.
+func height_at(x: float, z: float) -> float:
+	if package == null:
+		return NAN
+	var p := to_local(Vector3(x, 0.0, z))
+	if not package.contains(p.x, p.z):
+		return NAN
+	return global_position.y + origin_offset + _backend.surface_height(p.x, p.z)
+
+
+## Global position of a geodetic point (degrees, metres above the WGS84 ellipsoid) in this terrain's frame.
+func geodetic_to_global(lat: float, lon: float, h: float) -> Vector3:
+	var p := GeoMath.geodetic_to_local(lat, lon, h, package.latitude, package.longitude, package.origin_height)
+	return to_global(p + Vector3(0.0, origin_offset, 0.0))
+
+
+## [lat, lon, h] of a global position.
+func global_to_geodetic(p: Vector3) -> PackedFloat64Array:
+	var l := to_local(p) - Vector3(0.0, origin_offset, 0.0)
+	return GeoMath.local_to_geodetic(l, package.latitude, package.longitude, package.origin_height)
+
+
+## Ellipsoidal height (WGS84, metres) of the terrain surface at a latitude / longitude; NAN outside the package.
+func geodetic_height(lat: float, lon: float) -> float:
+	if package == null:
+		return NAN
+	var lat0 := package.latitude
+	var lon0 := package.longitude
+	var h0 := package.origin_height
+	var h := h0
+	# The local up axis is within a fraction of a degree of the ellipsoid normal here, so the vertical gap to the
+	# surface is almost exactly the height correction; a few rounds settle it to well under a millimetre.
+	for i in 8:
+		var enu := GeoMath.ecef_to_enu(GeoMath.geodetic_to_ecef(lat, lon, h), lat0, lon0, h0)
+		if not package.contains(enu[0], -enu[1]):
+			return NAN
+		var dy := _backend.surface_height(enu[0], -enu[1]) - enu[2]
+		h += dy
+		if absf(dy) < 1e-5:
+			break
+	return h
+
+
+## Lines that must be shown wherever the terrain is shown (data licences).
+func attribution() -> PackedStringArray:
+	return package.attribution() if package else PackedStringArray()
+
+
+func _shadow_setting() -> GeometryInstance3D.ShadowCastingSetting:
+	return GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast_shadows \
+			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+func _align_to_scene_origin() -> void:
+	if not is_inside_tree():
+		return
+	var o := get_tree().get_first_node_in_group(&"dis_geo_origin")
+	if o == null:
+		return
+	var lat: float = o.get(&"latitude")
+	var lon: float = o.get(&"longitude")
+	var h: float = o.get(&"height")
+	# 1e-7 degrees is about 1 cm.
+	if absf(lat - package.latitude) > 1e-7 or absf(lon - package.longitude) > 1e-7:
+		origin_warning = ("scene origin (%.7f, %.7f) differs from the package origin (%.7f, %.7f); terrain and " +
+				"DIS entities will not line up. Set DisGeoOrigin to the package origin or rebuild the package.") % [
+				lat, lon, package.latitude, package.longitude]
+		push_warning("GeoTerrain: " + origin_warning)
+		return
+	# Same tangent plane, different height along its normal: a pure vertical shift.
+	origin_offset = package.origin_height - h
+
+
+func _update_collision(target: Vector3, force: bool) -> void:
+	var pkg := package
+	var cells := pkg.samples - 1
+	var center := Vector2(target.x, target.z)
+	if not force and center.distance_to(_collision_center) < collision_size * 0.25:
+		return
+	_collision_center = center
+	var half := pkg.size_m * 0.5
+	var n := clampi(int(collision_size / pkg.spacing), 2, cells)
+	var c0 := clampi(roundi((target.x + half) / pkg.spacing) - n / 2, 0, cells - n)
+	var r0 := clampi(roundi((target.z + half) / pkg.spacing) - n / 2, 0, cells - n)
+	var region := pkg.heights.get_region(Rect2i(c0, r0, n + 1, n + 1))
+	# The shape is scaled uniformly by the spacing (one map cell = one unit), so heights are stored divided by it.
+	_shape.update_map_data_from_image(region, 0.0, 1.0 / pkg.spacing)
+	var cs := _body.get_child(0) as CollisionShape3D
+	var mid := pkg.grid_to_local(c0 + n * 0.5, r0 + n * 0.5)
+	cs.transform = Transform3D(Basis.from_scale(Vector3.ONE * pkg.spacing), Vector3(mid.x, origin_offset, mid.y))

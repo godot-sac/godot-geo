@@ -1,6 +1,6 @@
 extends GutTest
 ## Format contract between tools/build_terrain.py and Godot: the small committed package must load with plain
-## engine APIs (no addon code yet; GeoTerrain arrives in Phase 2).
+## engine APIs (GeoTerrainPackage uses the same calls).
 
 const PACKAGE := "res://tests/data/ankara_small"
 

@@ -1,0 +1,39 @@
+{
+  "city": {
+    "draw_calls": 43.0,
+    "frame_ms": 0.71,
+    "nodes": 244,
+    "primitives": 1778732.0
+  },
+  "hills_east": {
+    "draw_calls": 51.0,
+    "frame_ms": 0.66,
+    "nodes": 229,
+    "primitives": 1426480.0
+  },
+  "low_city": {
+    "draw_calls": 58.0,
+    "frame_ms": 0.77,
+    "nodes": 262,
+    "primitives": 1942576.0
+  },
+  "overview": {
+    "draw_calls": 12.0,
+    "frame_ms": 0.58,
+    "nodes": 37,
+    "primitives": 304156.0
+  },
+  "top_down": {
+    "draw_calls": 22.0,
+    "frame_ms": 0.76,
+    "nodes": 103,
+    "primitives": 844852.0
+  },
+  "valley": {
+    "draw_calls": 57.0,
+    "frame_ms": 0.7,
+    "nodes": 256,
+    "primitives": 1877036.0
+  },
+  "video_mem_mb": 461.6
+}

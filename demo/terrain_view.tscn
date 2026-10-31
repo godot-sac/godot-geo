@@ -1,0 +1,73 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://demo/terrain_view.gd" id="1"]
+[ext_resource type="Script" path="res://addons/geo/geo_terrain.gd" id="2"]
+
+[sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
+sky_top_color = Color(0.32, 0.5, 0.78, 1)
+sky_horizon_color = Color(0.7, 0.76, 0.84, 1)
+ground_bottom_color = Color(0.6, 0.65, 0.72, 1)
+ground_horizon_color = Color(0.7, 0.76, 0.84, 1)
+sun_angle_max = 20.0
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("sky_mat")
+
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+ambient_light_energy = 0.45
+reflected_light_source = 2
+tonemap_mode = 4
+fog_enabled = true
+fog_mode = 0
+fog_light_color = Color(0.68, 0.74, 0.83, 1)
+fog_density = 1.2e-05
+fog_aerial_perspective = 0.5
+fog_sky_affect = 0.3
+
+[node name="TerrainView" type="Node3D"]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.5, -0.5792, 0.6439, 0, 0.7431, 0.6691, -0.866, -0.3344, 0.3718, 0, 0, 0)
+light_color = Color(1, 0.96, 0.9, 1)
+light_energy = 1.7
+shadow_enabled = true
+directional_shadow_max_distance = 8000.0
+
+[node name="GeoTerrain" type="Node3D" parent="."]
+script = ExtResource("2")
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3000, 8000)
+near = 1.0
+far = 150000.0
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Info" type="Label" parent="HUD"]
+offset_left = 12.0
+offset_top = 10.0
+offset_right = 712.0
+offset_bottom = 120.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+
+[node name="Attribution" type="Label" parent="HUD"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = -52.0
+offset_right = 1500.0
+offset_bottom = -8.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 0.85)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 12
