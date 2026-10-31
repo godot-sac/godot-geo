@@ -21,3 +21,8 @@ terrain/
 # Phase 0: Terrain3D is only being evaluated (copy from its release zip); screenshots are regenerated
 addons/terrain_3d/
 prototypes/phase0/shots_tmp/
+
+# 3D DIS demo: sibling repositories linked by tools/link_siblings.ps1
+addons/dis
+addons/milsymbol
+demo/dis

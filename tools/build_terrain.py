@@ -302,6 +302,9 @@ def bbox_overlap(scene: list[float], area: tuple[float, float, float, float]) ->
     return (w * h) / ((area[2] - area[0]) * (area[3] - area[1]))
 
 
+MAX_SCENE_READS = 12
+
+
 def build_color(grid: Grid, year: int, max_cloud: float, scene_ids: list[str] | None) -> tuple[np.ndarray, list[dict]]:
     """Colour of every grid sample from Sentinel-2 L2A true-colour (TCI) images. Scenes are taken clearest first
     until every sample is covered (TCI value 0 = no data)."""
@@ -323,7 +326,15 @@ def build_color(grid: Grid, year: int, max_cloud: float, scene_ids: list[str] | 
     color = np.zeros((grid.count, grid.count, 3), np.uint8)
     filled = np.zeros((grid.count, grid.count), bool)
     used = []
+    exhausted = set()  # MGRS tiles whose footprint adds nothing more (scenes of one tile cover the same ground)
+    reads = 0
     for item in items:
+        tile = item["id"].split("_")[1]
+        if tile in exhausted:
+            continue
+        if reads >= MAX_SCENE_READS:
+            break
+        reads += 1
         data, transform, x, y = read_scene_window(item["assets"]["visual"]["href"], item["id"], lat, lon)
         c, r = ~transform @ (x, y)
         r -= 0.5  # raster coordinates address pixel corners; centres sit at +0.5
@@ -343,6 +354,9 @@ def build_color(grid: Grid, year: int, max_cloud: float, scene_ids: list[str] | 
             used.append({"id": item["id"], "datetime": p["datetime"], "cloud_cover": p["eo:cloud_cover"],
                          "coverage": float(take.mean())})
             log(f"  {item['id']}: {take.mean() * 100:.1f} % of samples (cloud {p['eo:cloud_cover']:.3f} %)")
+        if take.mean() < 1e-4:
+            exhausted.add(tile)
+            log(f"  {item['id']}: nothing new, skipping other scenes of tile {tile}")
         if filled.all() or len(used) >= 8:
             break
     if not filled.all():

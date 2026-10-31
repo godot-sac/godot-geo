@@ -27,7 +27,7 @@ data:
 
 ### Copernicus Sentinel-2
 Full, free and open access (Copernicus data policy). Required notice: "Contains modified Copernicus Sentinel data
-[year]". `docs/phase0/*.jpg` and `docs/phase2/*.jpg` contain modified Copernicus Sentinel data 2025 and the Copernicus DEM notice above.
+[year]". `docs/phase0/*.jpg`, `docs/phase2/*.jpg` and `docs/demo3d/*.jpg` contain modified Copernicus Sentinel data 2025 and the Copernicus DEM notice above.
 
 ### EGM2008 geoid (NGA)
 Used through the PROJ grid `us_nga_egm08_25.tif` at package build time (public domain, U.S. National

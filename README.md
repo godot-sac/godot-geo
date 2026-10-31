@@ -3,8 +3,9 @@
 Real-world terrain for Godot 4 from open data — Copernicus DEM elevation and Sentinel-2 imagery — in the same
 coordinate system as [godot-dis](../godot-dis) (WGS84 → local ENU → Godot), so DIS entities sit on the right ground.
 
-> 🚧 Phase 2 done: `GeoTerrain` node with its own CDLOD renderer, height queries and collision, on a 40 × 40 km
-> Ankara package. Next: godot-dis integration and a 3D demo. See [PLAN.md](PLAN.md).
+> 🚧 Phase 3 done: `GeoTerrain` node with its own CDLOD renderer, height queries and collision; a 3D DIS demo where
+> units from several simulations drive on the real terrain of Ankara ([docs/demo-3d.md](docs/demo-3d.md)).
+> See [PLAN.md](PLAN.md).
 
 ![Ankara at 10 m, drawn by GeoTerrain](docs/phase2/city.jpg)
 
@@ -27,7 +28,8 @@ rights reserved.</sub>
    ```
    Details: [docs/geo-terrain.md](docs/geo-terrain.md).
 
-Demo: `res://demo/terrain_view.tscn` (free camera; right mouse + WASD, 1–6 views, F to walk on the ground).
+Demos: `res://demo/terrain_view.tscn` (terrain only; right mouse + WASD, 1–6 views, F to walk on the ground) and
+`res://demo/dis3d.tscn` (DIS exercise in 3D with godot-dis and godot-milsymbol, [setup](docs/demo-3d.md)).
 
 ## License
 MIT. Terrain data is not part of this repository (except a 3.6 km test package); packages carry the attribution
