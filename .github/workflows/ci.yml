@@ -1,0 +1,81 @@
+# Runs the Godot (GUT) tests on Windows and Linux and the package builder tests (pytest) on Linux, then packs
+# addons/geo as one artifact.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  godot:
+    name: Godot tests (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            godot_zip: Godot_v4.7.2-stable_win64.exe.zip
+            godot_exe: Godot_v4.7.2-stable_win64_console.exe
+          - name: Linux
+            os: ubuntu-22.04
+            godot_zip: Godot_v4.7.2-stable_linux.x86_64.zip
+            godot_exe: Godot_v4.7.2-stable_linux.x86_64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot
+        run: |
+          curl -sSfL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/${{ matrix.godot_zip }}"
+          python -m zipfile -e godot.zip godot_bin
+          chmod +x "godot_bin/${{ matrix.godot_exe }}"
+          echo "GODOT=$PWD/godot_bin/${{ matrix.godot_exe }}" >> "$GITHUB_ENV"
+      - name: GUT
+        run: |
+          "$GODOT" --headless --path . --import || true
+          "$GODOT" --headless --path . -s addons/gut/gut_cmdln.gd
+
+  python:
+    name: Package builder tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # DEM tiles and the geoid grid are downloaded on the first run (public AWS buckets, PROJ CDN).
+      - uses: actions/cache@v4
+        with:
+          path: |
+            tools/.cache
+            ~/.local/share/proj
+          key: geo-data-${{ hashFiles('tests/python/**', 'tools/requirements.txt') }}
+          restore-keys: geo-data-
+      - name: Install
+        run: |
+          python -m venv tools/.venv
+          tools/.venv/bin/python -m pip install --quiet -r tools/requirements.txt
+      - name: pytest
+        run: tools/.venv/bin/python -m pytest tests/python -q -p no:cacheprovider
+
+  package:
+    name: Addon package
+    needs: [godot, python]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble addons/geo
+        run: |
+          cp LICENSE THIRD_PARTY_NOTICES.md addons/geo/
+          find addons/geo -type f | sort
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-geo-addon
+          path: addons/geo
