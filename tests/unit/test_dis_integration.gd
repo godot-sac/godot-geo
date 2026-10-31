@@ -1,5 +1,5 @@
 extends GutTest
-## GeoTerrain as the ground of godot-dis DisEntityManager (needs tools/link_siblings.ps1; pending without it).
+## GeoTerrain as the ground of godot-dis DisEntityManager (needs tools/link_siblings.py; pending without it).
 ## godot-dis classes are created through ClassDB so this file parses without the addon.
 
 const PACKAGE := "res://tests/data/ankara_small"
@@ -8,7 +8,7 @@ const PACKAGE := "res://tests/data/ankara_small"
 func _available() -> bool:
 	if ClassDB.class_exists(&"DisEntityManager"):
 		return true
-	pending("godot-dis not linked (tools/link_siblings.ps1)")
+	pending("godot-dis not linked (tools/link_siblings.py)")
 	return false
 
 

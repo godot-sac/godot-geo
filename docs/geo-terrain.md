@@ -16,6 +16,7 @@ GeoTerrain                 loading, queries, collision, alignment with DisGeoOri
 | `backend` | `CDLOD` | renderer; only CDLOD so far |
 | `lod_distance` | 4.0 | level 0 range in patch sizes (64 cells); higher = sharper and slower, minimum 3.5 |
 | `cast_shadows` | true | |
+| `ground_detail` | 0 | procedural detail on the ground near the camera (0–1); not data, it only breaks up the blur of 10 m imagery seen from a few metres. The demos use 0.6 |
 | `collision_enabled` | true | |
 | `collision_size` | 2000 | edge of the square collision patch, metres; it follows the target |
 | `collision_target` | — | node the patch follows; the active camera if empty |

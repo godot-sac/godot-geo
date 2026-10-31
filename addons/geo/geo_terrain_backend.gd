@@ -24,3 +24,8 @@ func surface_height(_x: float, _z: float) -> float:
 
 func set_cast_shadows(_mode: GeometryInstance3D.ShadowCastingSetting) -> void:
 	pass
+
+
+## Procedural ground detail near the camera, 0 (off) to 1; optional for a backend.
+func set_ground_detail(_strength: float) -> void:
+	pass

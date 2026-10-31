@@ -53,9 +53,10 @@ directional_shadow_max_distance = 3000.0
 
 [node name="GeoTerrain" type="Node3D" parent="."]
 script = ExtResource("2")
+ground_detail = 0.6
 
 [node name="DisEntityManager" type="DisEntityManager" parent="."]
-smoothing_time = 0.5
+smoothing_time = 1.0
 
 [node name="OwnForces" type="Node3D" parent="."]
 

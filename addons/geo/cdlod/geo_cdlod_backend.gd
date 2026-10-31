@@ -60,6 +60,11 @@ func build(pkg: GeoTerrainPackage) -> void:
 	_mesh = patch_mesh(PATCH)
 
 
+func set_ground_detail(strength: float) -> void:
+	if _material:
+		_material.set_shader_parameter("detail_strength", strength)
+
+
 func set_cast_shadows(mode: GeometryInstance3D.ShadowCastingSetting) -> void:
 	_shadow_mode = mode
 	for mi: MeshInstance3D in _active.values():

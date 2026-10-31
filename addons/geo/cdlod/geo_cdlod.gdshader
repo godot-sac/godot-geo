@@ -17,6 +17,9 @@ uniform float morph_start = 0.7;
 uniform vec3 lod_camera;
 uniform float color_scale; // height spacing / colour spacing
 uniform float color_samples;
+// Procedural detail near the camera (not data): breaks up the 10 m imagery when seen from a few metres. 0 = off.
+uniform float detail_strength = 0.0;
+uniform float detail_distance = 800.0;
 
 // Node origin (column, row), samples per patch cell, level.
 instance uniform vec4 node_data;
@@ -62,6 +65,19 @@ vec3 normal_mip(vec2 p, int m) {
 	return normalize(vec3(-hx, 2.0 * e * spacing, -hz));
 }
 
+// Value noise; the lattice wraps every 289 cells so the hash stays exact in float32 far from the origin.
+float hash(vec2 c) {
+	c = mod(c, 289.0);
+	return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+float value_noise(vec2 p) {
+	vec2 c = floor(p);
+	vec2 f = p - c;
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(c), hash(c + vec2(1.0, 0.0)), f.x), mix(hash(c + vec2(0.0, 1.0)), hash(c + vec2(1.0)), f.x), f.y);
+}
+
 void fragment() {
 	vec2 p = grid_pos;
 	// Sample the normal from the mip whose texels are about one pixel, so distant slopes do not shimmer.
@@ -70,7 +86,16 @@ void fragment() {
 	int m0 = int(floor(lvl));
 	vec3 n = normalize(mix(normal_mip(p, m0), normal_mip(p, min(m0 + 1, normal_max_mip)), fract(lvl)));
 	NORMAL = normalize(mat3(VIEW_MATRIX) * mat3(MODEL_MATRIX) * n);
-	ALBEDO = texture(color_map, (p * color_scale + 0.5) / color_samples).rgb;
+	vec3 albedo = texture(color_map, (p * color_scale + 0.5) / color_samples).rgb;
+	if (detail_strength > 0.0) {
+		float fade = 1.0 - smoothstep(detail_distance * 0.4, detail_distance, length(VERTEX));
+		if (fade > 0.0) {
+			vec2 m = p * spacing; // metres
+			float dn = 0.5 * value_noise(m * 0.35) + 0.3 * value_noise(m * 1.7) + 0.2 * value_noise(m * 6.0);
+			albedo *= mix(1.0, 0.7 + 0.6 * dn, detail_strength * fade);
+		}
+	}
+	ALBEDO = albedo;
 	ROUGHNESS = 0.95;
 	SPECULAR = 0.2;
 }

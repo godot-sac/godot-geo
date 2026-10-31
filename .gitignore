@@ -22,7 +22,7 @@ terrain/
 addons/terrain_3d/
 prototypes/phase0/shots_tmp/
 
-# 3D DIS demo: sibling repositories linked by tools/link_siblings.ps1
+# 3D DIS demo: sibling repositories linked by tools/link_siblings.py
 addons/dis
 addons/milsymbol
 demo/dis

@@ -27,6 +27,13 @@ enum Backend { CDLOD }
 		cast_shadows = value
 		if _backend:
 			_backend.set_cast_shadows(_shadow_setting())
+## Procedural detail on the ground near the camera (0 = off). Not data: it only breaks up the blur of 10 m
+## imagery seen from a few metres; leave it off where the picture must show the data alone.
+@export_range(0.0, 1.0, 0.05) var ground_detail := 0.0:
+	set(value):
+		ground_detail = value
+		if _backend:
+			_backend.set_ground_detail(value)
 @export_group("Collision")
 @export var collision_enabled := true
 ## Edge length of the square collision patch kept around the target, in metres.
@@ -80,6 +87,7 @@ func load_package() -> Error:
 	add_child(_backend, false, INTERNAL_MODE_FRONT)
 	_backend.build(package)
 	_backend.set_cast_shadows(_shadow_setting())
+	_backend.set_ground_detail(ground_detail)
 	if collision_enabled and not Engine.is_editor_hint():
 		_body = StaticBody3D.new()
 		_body.name = "Collision"
