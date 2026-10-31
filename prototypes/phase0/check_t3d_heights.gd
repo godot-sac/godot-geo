@@ -2,7 +2,7 @@
 ##   <godot> --headless --path . -s res://prototypes/phase0/check_t3d_heights.gd
 extends SceneTree
 
-const PACKAGE := "res://terrain/ankara_proto"
+const PACKAGE := "res://terrain/ankara"
 
 
 func _initialize() -> void:
@@ -11,10 +11,10 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var meta: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(PACKAGE + "/terrain.json"))
-	var n: int = meta.samples
-	var spacing: float = meta.spacing_m
+	var n: int = meta.height.samples
+	var spacing: float = meta.height.spacing_m
 	var half: float = meta.size_m * 0.5
-	var img := Image.create_from_data(n, n, false, Image.FORMAT_RF, FileAccess.get_file_as_bytes(PACKAGE + "/height.r32"))
+	var img := Image.load_from_file(ProjectSettings.globalize_path(PACKAGE + "/height.exr"))
 	var t := ClassDB.instantiate("Terrain3D") as Node3D
 	t.set("region_size", 1024)
 	t.set("vertex_spacing", spacing)

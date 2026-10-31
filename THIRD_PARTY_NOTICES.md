@@ -1,7 +1,7 @@
 # Third-Party Notices
 
 Entries are added when third-party code or data is copied into this repository or shipped in a terrain package.
-Development-time tools (rasterio/GDAL, numpy, pyproj/PROJ, pymap3d, Pillow) are listed in `tools/requirements.txt`;
+Development-time tools (rasterio/GDAL, numpy, pyproj/PROJ, pymap3d, Pillow, OpenEXR, pytest) are listed in `tools/requirements.txt`;
 their code is not included.
 
 ## Included
@@ -10,7 +10,13 @@ their code is not included.
 `addons/gut/` — tests only, not part of the distributed addon. MIT License, Copyright (c) 2018 Tom "Butch" Wesley.
 Full text: `addons/gut/LICENSE.md`.
 
-## Data (not in the repository; attribution carried by every terrain package and by derived screenshots)
+### geo_cases.txt
+`tests/golden/geo_cases.txt` is copied from this project's sibling godot-dis (MIT, same author); generated there
+with pymap3d.
+
+## Data (attribution carried by every terrain package and by derived screenshots)
+Packages are not in the repository, except the small test package `tests/data/ankara_small/` (3.6 × 3.6 km), which
+contains modified Copernicus DEM and Sentinel-2 data under the notices below (see its `terrain.json`).
 
 ### Copernicus DEM GLO-30
 Free of charge, commercial use permitted (licence: Copernicus DEM licence, COPDEM-30). Required notice for modified

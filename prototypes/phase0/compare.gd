@@ -4,7 +4,7 @@
 ## Without --out the scene stays open with a free camera (WASD + right mouse, Shift = fast, wheel = speed).
 extends Node3D
 
-const PACKAGE := "res://terrain/ankara_proto"
+const PACKAGE := "res://terrain/ankara"
 
 ## name -> [camera position, look-at target]; Y is filled from the terrain where marked NAN (height above ground).
 var views := {
@@ -34,9 +34,9 @@ func _ready() -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)  # honest frame times
 	var t0 := Time.get_ticks_msec()
 	meta = JSON.parse_string(FileAccess.get_file_as_string(PACKAGE + "/terrain.json"))
-	var n: int = meta.samples
-	var bytes := FileAccess.get_file_as_bytes(PACKAGE + "/height.r32")
-	heights = Image.create_from_data(n, n, false, Image.FORMAT_RF, bytes)
+	var n: int = meta.height.samples
+	heights = Image.load_from_file(ProjectSettings.globalize_path(PACKAGE + "/height.exr"))
+	assert(heights.get_width() == n)
 	var color := Image.load_from_file(ProjectSettings.globalize_path(PACKAGE + "/color.png"))
 	if renderer == "terrain3d":
 		_build_terrain3d(color)
@@ -44,7 +44,7 @@ func _ready() -> void:
 		color.generate_mipmaps()
 		var mesh := ProtoMeshTerrain.new()
 		add_child(mesh)
-		mesh.build(heights, ImageTexture.create_from_image(color), meta.size_m, meta.spacing_m)
+		mesh.build(heights, ImageTexture.create_from_image(color), meta.size_m, meta.height.spacing_m)
 	load_ms = Time.get_ticks_msec() - t0
 	print("renderer=%s load=%d ms" % [renderer, load_ms])
 	if out_dir.is_empty():
@@ -57,7 +57,7 @@ func _ready() -> void:
 func _build_terrain3d(color: Image) -> void:
 	var t := ClassDB.instantiate("Terrain3D") as Node3D
 	t.set("region_size", 1024)
-	t.set("vertex_spacing", float(meta.spacing_m))
+	t.set("vertex_spacing", float(meta.height.spacing_m))
 	var mat: Resource = ClassDB.instantiate("Terrain3DMaterial")
 	mat.set("show_checkered", false)
 	mat.set("show_colormap", true)
@@ -75,8 +75,8 @@ func _build_terrain3d(color: Image) -> void:
 
 func ground_height(x: float, z: float) -> float:
 	var half: float = meta.size_m * 0.5
-	var px := clampi(roundi((x + half) / meta.spacing_m), 0, heights.get_width() - 1)
-	var pz := clampi(roundi((z + half) / meta.spacing_m), 0, heights.get_height() - 1)
+	var px := clampi(roundi((x + half) / meta.height.spacing_m), 0, heights.get_width() - 1)
+	var pz := clampi(roundi((z + half) / meta.height.spacing_m), 0, heights.get_height() - 1)
 	return heights.get_pixel(px, pz).r
 
 
