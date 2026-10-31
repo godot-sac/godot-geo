@@ -407,7 +407,8 @@ def write_package(out: Path, grid: Grid, color_grid: Grid, height: np.ndarray, c
         "attribution": [DEM_ATTRIBUTION, f"Contains modified Copernicus Sentinel data {', '.join(years)}"],
         "disclaimer": DEM_DISCLAIMER,
     }
-    (out / "terrain.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+    (out / "terrain.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
+                                      newline="\n")
     gdignore = out.parent / ".gdignore"  # keep the Godot editor from importing big package files under res://
     if out.parent.name == "terrain" and not gdignore.exists():
         gdignore.touch()

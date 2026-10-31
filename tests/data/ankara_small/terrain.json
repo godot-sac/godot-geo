@@ -2,7 +2,7 @@
   "format": "godot-geo-terrain",
   "format_version": 1,
   "generator": "godot-geo tools/build_terrain.py 0.1.0",
-  "created": "2026-10-31T15:36:29+00:00",
+  "created": "2026-10-31T15:41:50+00:00",
   "origin": {
     "latitude": 39.9334,
     "longitude": 32.8597,
