@@ -15,8 +15,10 @@ Full text: `addons/gut/LICENSE.md`.
 with pymap3d.
 
 ## Data (attribution carried by every terrain package and by derived screenshots)
-Packages are not in the repository, except the small test package `tests/data/ankara_small/` (3.6 × 3.6 km), which
-contains modified Copernicus DEM and Sentinel-2 data under the notices below (see its `terrain.json`).
+Packages are not in the repository, except the small test packages `tests/data/ankara_small/` (3.6 × 3.6 km),
+`tests/data/fiji_small/` and `tests/data/norway_small/` (3 × 3 km each), which contain modified Copernicus DEM and
+Sentinel-2 data under the notices below (see their `terrain.json`). Packages built from your own files
+(`--dem`, `--imagery`) carry the notices you pass with `--attribution`.
 
 ### Copernicus DEM GLO-30
 Free of charge, commercial use permitted (licence: Copernicus DEM licence, COPDEM-30). Required notice for modified
@@ -27,11 +29,18 @@ data:
 
 ### Copernicus Sentinel-2
 Full, free and open access (Copernicus data policy). Required notice: "Contains modified Copernicus Sentinel data
-[year]". `docs/phase0/*.jpg`, `docs/phase2/*.jpg` and `docs/demo3d/*.jpg` contain modified Copernicus Sentinel data 2025 and the Copernicus DEM notice above.
+[year]". `docs/phase0/*.jpg`, `docs/phase2/*.jpg`, `docs/demo3d/*.jpg` and `docs/visibility/*.jpg` contain modified Copernicus Sentinel data 2025 and the Copernicus DEM notice above.
 
-### EGM2008 geoid (NGA)
-Used through the PROJ grid `us_nga_egm08_25.tif` at package build time (public domain, U.S. National
-Geospatial-Intelligence Agency). Only derived heights end up in packages.
+### EGM2008 and EGM96 geoids (NGA)
+Used through the PROJ grids `us_nga_egm08_25.tif` and `us_nga_egm96_15.tif` at package build time (public domain,
+U.S. National Geospatial-Intelligence Agency); `--fetch-geoid` stores them in `tools/.cache/geoid/` (not in git).
+Only derived heights end up in packages.
+
+## Specifications and algorithms (no code copied)
+- `tools/dted.py` follows the public DTED specification MIL-PRF-89020B; GDAL's DTED driver is used only as a test
+  oracle.
+- `GeoVisibility.viewshed` implements the R2 sweep described by W. R. Franklin and C. Ray (1994). GRASS GIS
+  `r.viewshed` (GPL) was background reading only.
 
 ## Evaluated, not included
 - Terrain3D 1.1.0 (MIT, Copyright (c) 2023-2026 Cory Petkovsek, Roope Palmroos, and Contributors) — Phase 0

@@ -47,5 +47,16 @@ height at its `x, z` (when the scene origin equals the package origin). Between 
   "disclaimer": "..."
 }
 ```
+`sources` describes what went in, and its shape depends on the data:
+- `elevation`: the Copernicus form above, or for your own files (`--dem`, see [own-data.md](own-data.md))
+  `{"product": "user data", "files": [{"file", "format", "sha256", "crs", "vertical_datum", "vertical_datum_assumed",
+  "coverage"}], "fallback": {...}}` (`fallback` only when one supplied samples; `coverage` = share of samples).
+- `geoid` is the first entry of `geoids`, the list of geoid models applied (`EGM2008`, `EGM96`; empty for
+  ellipsoidal input, `geoid` then says so).
+- `imagery`: the Sentinel-2 form above, `{"product": "user imagery", "files": [{"file", "sha256", "crs",
+  "coverage"}]}`, or `{"product": "hillshade computed from the heights"}`.
+- `attribution` lists only the notices of the data actually used, plus any `--attribution` text. Longitudes in
+  `corners` are in [-180, 180), so across the antimeridian the west corners can have larger values than the east ones.
+
 Readers must check `format` and `format_version`; additions within version 1 are new keys only.
 Anything that shows the terrain (a game, a screenshot, a video) must show the `attribution` lines.

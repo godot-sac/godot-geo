@@ -30,6 +30,12 @@ GeoTerrain                 loading, queries, collision, alignment with DisGeoOri
 | `height_at(x, z) -> float` | global surface height; `NAN` outside the package |
 | `geodetic_height(lat, lon) -> float` | WGS84 ellipsoidal height of the ground; `NAN` outside |
 | `geodetic_to_global(lat, lon, h) -> Vector3` / `global_to_geodetic(p)` | positions in the terrain's frame |
+| `raycast(from, direction, max_distance) -> Dictionary` | first hit on the surface: `hit`, `position`, `distance`, `normal` |
+| `line_of_sight(a, b, refraction) -> Dictionary` | see [Visibility queries](#visibility-queries) |
+| `viewshed(observer, radius, target_height, resolution, refraction) -> Image` | visible / hidden ground around an eye position |
+| `viewshed_rect(observer, radius) -> Rect2` | global x / z square covered by `viewshed` |
+| `set_overlay(image, rect)` / `clear_overlay()` | RGBA image blended over the terrain colour in a global x / z rectangle |
+| `to_package_local(p)` / `from_package_local(p)` | global position <-> package frame (for `GeoVisibility` on a thread) |
 | `attribution() -> PackedStringArray` | data notices to show with the terrain |
 | `is_loaded()`, signal `loaded` | |
 
@@ -43,6 +49,52 @@ hits `height_at` (tested within 1 cm). Between triangulation and the package's b
 convention the difference is a few metres at most at cell centres in rough terrain; at grid points both are exact.
 Farther away the renderer draws coarser levels, so the picture may differ from `height_at` there; that is invisible
 at those distances.
+
+## Visibility queries
+`GeoVisibility` (`addons/geo/geo_visibility.gd`) runs the queries on the package grid; the `GeoTerrain` methods wrap
+it in scene coordinates. They use the surface above, so a query agrees with what is drawn and with collision.
+
+**Line of sight** `line_of_sight(a, b, refraction := 0.0)`, `a` and `b` are eye / target positions (lift points on
+the ground by the eye or antenna height):
+
+| Key | |
+|---|---|
+| `visible` | no part of the segment inside the package is below the surface (1 mm tolerance) |
+| `point` | first obstruction, where the segment enters the terrain; `b` if visible |
+| `distance` | from `a` to `point` |
+| `clearance` | the segment's lowest height above the surface, metres; negative when blocked (depth) |
+| `clearance_point` | where that is |
+| `partial` | part of the segment is outside the package and was not tested |
+
+The walk is exact for the triangulated surface: between consecutive crossings of grid lines and cell diagonals
+(`x`, `z` or `x + z` on a grid line) both the segment and the surface are planar, so the clearance is linear there
+and is checked at every crossing. Cost: about three evaluations per cell crossed (0.4 ms for 3 km at 10 m in
+GDScript). Earth curvature is always included, because package heights are relative to the origin's tangent plane.
+`refraction` is the coefficient *k* of a ray bending towards the ground with radius *R / k*: the segment is raised by
+*s₁ s₂ k / 2R* (*s₁*, *s₂* distances to the ends). Common values: 0 (geometric), 0.13 (optical), 0.25 (radio,
+the "4/3 Earth").
+
+**Ray cast** `raycast(from, direction, max_distance)`: the same walk, stopping at the first entry; `normal` is the
+hit triangle's. Used by the visibility demo to pick points under the mouse without physics.
+
+**Viewshed** `viewshed(observer, radius, target_height, resolution := 256, refraction := 0.0)` returns an `Image`
+(`FORMAT_LA8`, `resolution²`, row 0 = north) over `viewshed_rect(observer, radius)`: luminance 255 where a point
+`target_height` above the ground is visible from `observer`, 0 where hidden; alpha 0 outside the radius or the
+package. Algorithm: R2 ray sweep (W. R. Franklin, C. Ray, *Higher isn't necessarily better: visibility algorithms
+and experiments*, 1994): one ray from the observer to every border pixel, stepping at most one pixel and one height
+sample, keeping the steepest slope so far; each pixel takes the verdict of the step nearest its centre. It agrees
+with per-pixel `line_of_sight` on 96–98 % of pixels in the tests (differences at visibility edges). Cost: about
+`2 · resolution² · max(1, pixel / spacing)` surface samples; Ankara at 10 m, radius 5 km, 256²: 0.3–1.4 s in
+GDScript, so the demo runs it on a `WorkerThreadPool` task with `GeoVisibility.viewshed(terrain.package,
+terrain.to_package_local(eye), ...)` (node transforms may only be read on the main thread).
+`GeoVisibility.viewshed_colors(image)` turns the result into an RGBA overlay for `set_overlay`.
+
+GRASS GIS `r.viewshed` (Haverkort, Toma, Zhuang) was used as background reading only; no code was taken from it
+(GPL). Copernicus DEM is a surface model: buildings and trees block the view as they would at their roof height.
+
+Demo: `demo/visibility.tscn` ([screenshot](visibility/viewshed.jpg)); `-- --check` prints a JSON report (viewshed
+time and visible share, lines of sight on three rings, their agreement with the viewshed, a ray cast) and exits 1
+if something is implausible.
 
 ## Alignment with godot-dis
 If the scene has a node in group `dis_geo_origin` (godot-dis `DisGeoOrigin`) — godot-geo does not depend on
@@ -71,6 +123,8 @@ Ankara 40 × 40 km at 10 m, 1600 × 900, RTX 4080: load 0.8 s, 0.6–0.8 ms per 
 nodes ([stats](phase2/stats.json), [views](phase2/views_sheet.jpg)).
 
 ## Limits (v0.1)
+- Queries are GDScript: fine for tens of lines of sight per frame and occasional viewsheds, not for thousands of
+  sensors per frame.
 - Packages are read from the file system (`res://` in the editor, absolute paths); exported games need the package
   next to the executable. One package at a time, no streaming.
 - Close to the ground the picture is limited by the data (30 m DEM, 10 m imagery), not by the renderer; a detail
