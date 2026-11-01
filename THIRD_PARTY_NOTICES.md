@@ -39,6 +39,9 @@ Only derived heights end up in packages.
 ## Specifications and algorithms (no code copied)
 - `tools/dted.py` follows the public DTED specification MIL-PRF-89020B; GDAL's DTED driver is used only as a test
   oracle.
+- `GeoMath` UTM follows C. F. F. Karney, *Transverse Mercator with an accuracy of a few nanometers* (2011). The golden
+  file `tests/golden/utm_mgrs_cases.txt` was generated with PROJ (pyproj) and the Python `mgrs` package (MIT,
+  Howard Butler); `mgrs` is not a dependency.
 - `GeoVisibility.viewshed` implements the R2 sweep described by W. R. Franklin and C. Ray (1994). GRASS GIS
   `r.viewshed` (GPL) was background reading only.
 

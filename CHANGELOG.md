@@ -26,7 +26,9 @@ All notable changes to this project are documented here. Versions follow [semver
 - Visibility queries: `GeoTerrain.line_of_sight` (exact on the drawn surface, first obstruction, clearance,
   optional refraction), `raycast`, `viewshed` (R2 ray sweep, image), `set_overlay` / `clear_overlay`;
   `GeoVisibility` for worker threads.
-- Demo `demo/visibility.tscn`: line of sight under the mouse, viewshed overlay, `--check` report.
+- Demo `demo/visibility.tscn`: line of sight under the mouse, viewshed overlay, `--check` report; positions as MGRS.
+- `GeoMath`: UTM (Krüger series, Norway / Svalbard zones) and MGRS conversions, tested against PROJ and the `mgrs`
+  package (golden file).
 
 ### Changed
 - Sentinel-2 scenes whose true-colour asset is not a public COG (requester-pays JPEG 2000) are skipped; when none is

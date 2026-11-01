@@ -217,16 +217,17 @@ func _update_info() -> void:
 		return
 	var g := terrain.global_to_geodetic(observer)
 	var lines := PackedStringArray()
-	lines.append("observer %.5f, %.5f  ground %.0f m (WGS84)  eye +%.0f m  |  target +%.1f m  |  refraction k = %.2f" % [
-			g[0], g[1], g[2], observer_height, target_height, _refraction()])
+	lines.append("observer %s  %.5f, %.5f  ground %.0f m (WGS84)  eye +%.0f m  |  target +%.1f m  |  refraction k = %.2f" % [
+			GeoMath.geodetic_to_mgrs(g[0], g[1]), g[0], g[1], g[2], observer_height, target_height, _refraction()])
 	if not los.is_empty():
 		var tg := terrain.global_to_geodetic(target)
 		var d := _eye().distance_to(target + Vector3(0.0, target_height, 0.0))
 		if los.visible:
-			lines.append("cursor %.5f, %.5f  %.0f m: VISIBLE, clearance %.1f m" % [tg[0], tg[1], d, los.clearance])
+			lines.append("cursor %s  %.0f m: VISIBLE, clearance %.1f m" % [GeoMath.geodetic_to_mgrs(tg[0], tg[1]), d,
+					los.clearance])
 		else:
-			lines.append("cursor %.5f, %.5f  %.0f m: BLOCKED at %.0f m (%.1f m below the line at worst)" % [
-					tg[0], tg[1], d, los.distance, -los.clearance])
+			lines.append("cursor %s  %.0f m: BLOCKED at %.0f m (%.1f m below the line at worst)" % [
+					GeoMath.geodetic_to_mgrs(tg[0], tg[1]), d, los.distance, -los.clearance])
 		if los.partial:
 			lines.append("  part of the line is outside the package (not tested)")
 	if _task >= 0:

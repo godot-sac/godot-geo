@@ -104,6 +104,23 @@ godot-dis, it reads `latitude`, `longitude`, `height` by name:
 - different latitude / longitude: a warning (`origin_warning`); the terrain is not moved, because a different
   tangent plane is a rotation, not a shift. Rebuild the package at the scene origin.
 
+## GeoMath
+`GeoMath` (`addons/geo/geo_math.gd`) is a standalone class of static WGS84 functions in double precision (GDScript
+floats are 64-bit); it needs no terrain and can be used on its own:
+
+| Function | |
+|---|---|
+| `geodetic_to_ecef(lat, lon, h)` / `ecef_to_geodetic(ecef)` | geodetic (degrees, ellipsoidal metres) <-> ECEF |
+| `ecef_to_enu(ecef, lat0, lon0, h0)` / `enu_to_ecef(enu, ...)` | ECEF <-> east / north / up at an origin |
+| `geodetic_to_local(lat, lon, h, lat0, lon0, h0) -> Vector3` / `local_to_geodetic(p, ...)` | <-> Godot axes (+X east, +Y up, −Z north), the frame of godot-dis `DisGeoOrigin` |
+| `geodetic_to_utm(lat, lon) -> Dictionary` / `utm_to_geodetic(zone, north, e, n)` | UTM (Krüger series to 6th order, Karney 2011; Norway and Svalbard zone exceptions) |
+| `geodetic_to_mgrs(lat, lon, digits := 5) -> String` / `mgrs_to_geodetic(mgrs)` | MGRS, truncated as the standard requires; back to the centre of the square |
+
+UTM and MGRS cover −80° ≤ latitude < 84° (UPS polar areas are not supported). Tests: `tests/golden/geo_cases.txt`
+(shared with godot-dis, from pymap3d) and `tests/golden/utm_mgrs_cases.txt` (UTM from PROJ, checked again by
+`tests/python/test_utm_golden.py`; MGRS strings from the Python `mgrs` package, MIT, used only to generate the file
+with `tools/make_utm_golden.py`). The visibility demo shows observer and cursor positions as MGRS.
+
 ## With 3D Tiles for Godot (not tested yet)
 Streamed 3D Tiles (buildings, photogrammetry, Cesium ion or other tile servers) are out of scope; 3D Tiles for Godot
 (Battle Road Labs, Apache-2.0) covers them. Using both in one scene should only need a shared origin: set its
