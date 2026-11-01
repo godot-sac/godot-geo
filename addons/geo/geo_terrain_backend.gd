@@ -29,3 +29,8 @@ func set_cast_shadows(_mode: GeometryInstance3D.ShadowCastingSetting) -> void:
 ## Procedural ground detail near the camera, 0 (off) to 1; optional for a backend.
 func set_ground_detail(_strength: float) -> void:
 	pass
+
+
+## RGBA texture blended over the terrain colour inside `rect` (local x / z); null removes it.
+func set_overlay(_texture: Texture2D, _rect: Rect2) -> void:
+	pass

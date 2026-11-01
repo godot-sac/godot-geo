@@ -65,6 +65,15 @@ func set_ground_detail(strength: float) -> void:
 		_material.set_shader_parameter("detail_strength", strength)
 
 
+func set_overlay(texture: Texture2D, rect: Rect2) -> void:
+	if _material == null:
+		return
+	_material.set_shader_parameter("overlay_map", texture)
+	_material.set_shader_parameter("overlay_rect", Vector4(rect.position.x, rect.position.y, rect.size.x,
+			rect.size.y))
+	_material.set_shader_parameter("overlay_enabled", texture != null)
+
+
 func set_cast_shadows(mode: GeometryInstance3D.ShadowCastingSetting) -> void:
 	_shadow_mode = mode
 	for mi: MeshInstance3D in _active.values():

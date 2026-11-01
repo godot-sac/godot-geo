@@ -189,6 +189,76 @@ func geodetic_height(lat: float, lon: float) -> float:
 	return h
 
 
+## First point where the ray from global `from` along `direction` meets the terrain surface (the drawn and
+## collision surface, no physics involved). Returns {hit: bool, position: Vector3, distance: float,
+## normal: Vector3}; hit is false if the ray leaves the package or max_distance first.
+func raycast(from: Vector3, direction: Vector3, max_distance := 1.0e7) -> Dictionary:
+	if package == null:
+		return {"hit": false, "position": from, "distance": INF, "normal": Vector3.UP}
+	var r := GeoVisibility.raycast(package, _to_package(from), direction, max_distance)
+	r.position = _from_package(r.position)
+	return r
+
+
+## Line of sight between global points `a` and `b` (eye and target positions; lift points on the ground by the
+## eye / antenna height). Returns:
+##   visible: bool; point: first obstruction (where the line enters the terrain), or `b` when visible;
+##   distance: from `a` to point; clearance: the line's lowest height above the surface in metres (negative when
+##   blocked); clearance_point: where that is; partial: true if part of the line lies outside the package (that
+##   part is not tested).
+## `refraction` is the coefficient k of a ray bending towards the ground (0 = straight; 0.13 optical, 0.25 radio).
+## Earth curvature is always included (it is part of the heights).
+func line_of_sight(a: Vector3, b: Vector3, refraction := 0.0) -> Dictionary:
+	if package == null:
+		return {"visible": true, "point": b, "distance": a.distance_to(b), "clearance": INF,
+				"clearance_point": a, "partial": true}
+	var r := GeoVisibility.line_of_sight(package, _to_package(a), _to_package(b), refraction)
+	r.point = _from_package(r.point)
+	r.clearance_point = _from_package(r.clearance_point)
+	return r
+
+
+## Visibility of the ground around the global eye position `observer`, out to `radius` metres: which points
+## `target_height` above the surface it can see. Returns an Image (FORMAT_LA8, resolution x resolution) covering
+## viewshed_rect(observer, radius): luminance 255 visible, 0 hidden; alpha 0 outside the radius or the package.
+## GDScript, about 2 * resolution^2 surface samples: run it on a worker thread for large resolutions.
+func viewshed(observer: Vector3, radius: float, target_height := 0.0, resolution := 256,
+		refraction := 0.0) -> Image:
+	if package == null:
+		return null
+	return GeoVisibility.viewshed(package, _to_package(observer), radius, target_height, resolution, refraction)
+
+
+## Global x / z rectangle (position = north-west corner, x east, y = z south) covered by viewshed().
+func viewshed_rect(observer: Vector3, radius: float) -> Rect2:
+	return Rect2(observer.x - radius, observer.z - radius, 2.0 * radius, 2.0 * radius)
+
+
+## Draws `image` (any format; converted to RGBA8, blended by its alpha) over the terrain colour inside `rect`
+## (global x / z, as viewshed_rect). For analysis results such as GeoVisibility.viewshed_colors(viewshed(...)).
+func set_overlay(image: Image, rect: Rect2) -> void:
+	if _backend == null:
+		return
+	var img := image.duplicate() as Image
+	if img.get_format() != Image.FORMAT_RGBA8:
+		img.convert(Image.FORMAT_RGBA8)
+	var p := to_local(Vector3(rect.position.x, 0.0, rect.position.y))
+	_backend.set_overlay(ImageTexture.create_from_image(img), Rect2(p.x, p.z, rect.size.x, rect.size.y))
+
+
+func clear_overlay() -> void:
+	if _backend:
+		_backend.set_overlay(null, Rect2())
+
+
+func _to_package(p: Vector3) -> Vector3:
+	return to_local(p) - Vector3(0.0, origin_offset, 0.0)
+
+
+func _from_package(p: Vector3) -> Vector3:
+	return to_global(p + Vector3(0.0, origin_offset, 0.0))
+
+
 ## Lines that must be shown wherever the terrain is shown (data licences).
 func attribution() -> PackedStringArray:
 	return package.attribution() if package else PackedStringArray()

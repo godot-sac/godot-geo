@@ -20,6 +20,10 @@ uniform float color_samples;
 // Procedural detail near the camera (not data): breaks up the 10 m imagery when seen from a few metres. 0 = off.
 uniform float detail_strength = 0.0;
 uniform float detail_distance = 800.0;
+// Analysis overlay (viewshed etc.): RGBA blended by alpha over local x / z rectangle (x0, z0, width, depth).
+uniform bool overlay_enabled = false;
+uniform sampler2D overlay_map : source_color, filter_nearest, repeat_disable;
+uniform vec4 overlay_rect;
 
 // Node origin (column, row), samples per patch cell, level.
 instance uniform vec4 node_data;
@@ -93,6 +97,13 @@ void fragment() {
 			vec2 m = p * spacing; // metres
 			float dn = 0.5 * value_noise(m * 0.35) + 0.3 * value_noise(m * 1.7) + 0.2 * value_noise(m * 6.0);
 			albedo *= mix(1.0, 0.7 + 0.6 * dn, detail_strength * fade);
+		}
+	}
+	if (overlay_enabled) {
+		vec2 uv = (p * spacing - half_size - overlay_rect.xy) / overlay_rect.zw;
+		if (all(greaterThanEqual(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
+			vec4 o = texture(overlay_map, uv);
+			albedo = mix(albedo, o.rgb, o.a);
 		}
 	}
 	ALBEDO = albedo;
