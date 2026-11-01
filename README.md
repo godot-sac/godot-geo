@@ -31,6 +31,7 @@ rights reserved.</sub>
 - **`GeoTerrain` node** (GDScript, engine APIs only): loads a package and draws it with a CDLOD renderer
   (quadtree level of detail with geomorphing).
 - **Queries:** `height_at(x, z)`, `geodetic_height(lat, lon)`, conversions between geodetic and scene positions.
+- **`GeoMath`:** standalone WGS84 geodetic / ECEF / ENU / Godot, UTM and MGRS conversions in double precision.
 - **Visibility:** `line_of_sight(a, b)` (visible, first obstruction, clearance, optional refraction),
   `raycast(from, dir)`, `viewshed(observer, radius)` as an image, `set_overlay` to show it on the terrain
   ([details](docs/geo-terrain.md#visibility-queries)).
