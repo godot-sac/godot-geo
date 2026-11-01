@@ -104,6 +104,16 @@ godot-dis, it reads `latitude`, `longitude`, `height` by name:
 - different latitude / longitude: a warning (`origin_warning`); the terrain is not moved, because a different
   tangent plane is a rotation, not a shift. Rebuild the package at the scene origin.
 
+## With 3D Tiles for Godot (not tested yet)
+Streamed 3D Tiles (buildings, photogrammetry, Cesium ion or other tile servers) are out of scope; 3D Tiles for Godot
+(Battle Road Labs, Apache-2.0) covers them. Using both in one scene should only need a shared origin: set its
+`CesiumGeoreference` origin to the package origin from `terrain.json` (`origin.latitude`, `origin.longitude`,
+`origin.height`; heights here are WGS84 ellipsoidal). Its documentation does not state the local axis convention,
+so check it against ours (+X east, +Y up, −Z north) with a landmark known in both, e.g. by comparing
+`GeoTerrain.geodetic_to_global(lat, lon, h)` with where the tileset draws that point. Our package heights are a
+surface model like most photogrammetry, so streamed buildings and the terrain should meet at street level only
+where both sources agree. This combination has not been tried; reports are welcome.
+
 ## CDLOD backend
 `GeoCdlodBackend` implements Continuous Distance-Dependent Level of Detail (F. Strugar, 2009):
 - An implicit quadtree covers the grid; a leaf is 64 × 64 height cells, the root `64 · 2^L` cells (L = 6 for a
