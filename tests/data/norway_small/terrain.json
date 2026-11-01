@@ -1,0 +1,105 @@
+{
+  "format": "godot-geo-terrain",
+  "format_version": 1,
+  "generator": "godot-geo tools/build_terrain.py 0.1.0",
+  "created": "2026-11-01T16:57:06+00:00",
+  "origin": {
+    "latitude": 69.99,
+    "longitude": 23.27,
+    "height": 0.0
+  },
+  "frame": "local ENU tangent plane at the origin (WGS84); Godot +X east, +Y up, -Z north; row 0 = north edge, column 0 = west edge",
+  "size_m": 3000.0,
+  "height": {
+    "file": "height.exr",
+    "encoding": "OpenEXR float32, channel R, metres",
+    "samples": 101,
+    "spacing_m": 30.0,
+    "min": 25.425642013549805,
+    "max": 234.7679901123047,
+    "reference": "ENU up relative to the origin; geoid and Earth curvature included",
+    "interpolation": "bilinear between samples",
+    "sha256": "79c96dca68388abf1208b65b0c0d970c0f77e29f891662e4025b0ed078695417"
+  },
+  "color": {
+    "file": "color.png",
+    "encoding": "PNG RGB8, sRGB (Sentinel-2 L2A true colour (TCI))",
+    "samples": 101,
+    "spacing_m": 30.0,
+    "sha256": "d9b9390b3e65c4be946623f516613dae7327a600bcabe1ba48916c6e1bbbd66c"
+  },
+  "corners": {
+    "nw": {
+      "east": -1500.0,
+      "north": 1500.0,
+      "latitude": 70.00344110831767,
+      "longitude": 23.230712666079285
+    },
+    "ne": {
+      "east": 1500.0,
+      "north": 1500.0,
+      "latitude": 70.00344110831767,
+      "longitude": 23.309287333920707
+    },
+    "sw": {
+      "east": -1500.0,
+      "north": -1500.0,
+      "latitude": 69.97655021385721,
+      "longitude": 23.23076322657934
+    },
+    "se": {
+      "east": 1500.0,
+      "north": -1500.0,
+      "latitude": 69.97655021385721,
+      "longitude": 23.30923677342065
+    }
+  },
+  "sources": {
+    "elevation": {
+      "product": "Copernicus DEM GLO-30 (DSM)",
+      "vertical_datum": "EGM2008",
+      "access": "s3://copernicus-dem-30m",
+      "tiles": [
+        {
+          "name": "Copernicus_DSM_COG_10_N70_00_E023_00_DEM",
+          "sha256": "16a40a0187949623b9dd63bb51e1eebfb6b949cd4612de5ac9bd81cc46efaf0a"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N69_00_E023_00_DEM",
+          "sha256": "f7d1b703b6943269e9fa2e051dc0ed1e73b236e6ee31055db9bb13b38eaf44f9"
+        }
+      ]
+    },
+    "geoid": {
+      "model": "EGM2008",
+      "grid": "PROJ us_nga_egm08_25.tif (NGA, public domain)",
+      "n_min_m": 25.768317774082284,
+      "n_max_m": 25.892307977127622
+    },
+    "geoids": [
+      {
+        "model": "EGM2008",
+        "grid": "PROJ us_nga_egm08_25.tif (NGA, public domain)",
+        "n_min_m": 25.768317774082284,
+        "n_max_m": 25.892307977127622
+      }
+    ],
+    "imagery": {
+      "product": "Sentinel-2 L2A true colour (TCI)",
+      "access": "Earth Search STAC (earth-search.aws.element84.com/v1)",
+      "scenes": [
+        {
+          "id": "S2B_34WEC_20250718_0_L2A",
+          "datetime": "2025-07-18T10:51:13.768000Z",
+          "cloud_cover": 0.00071,
+          "coverage": 1.0
+        }
+      ]
+    }
+  },
+  "attribution": [
+    "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "Contains modified Copernicus Sentinel data 2025"
+  ],
+  "disclaimer": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30."
+}

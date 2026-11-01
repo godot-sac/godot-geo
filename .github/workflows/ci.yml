@@ -62,6 +62,7 @@ jobs:
         run: |
           python -m venv tools/.venv
           tools/.venv/bin/python -m pip install --quiet -r tools/requirements.txt
+          tools/.venv/bin/python -I tools/build_terrain.py --fetch-geoid
       - name: pytest
         run: tools/.venv/bin/python -m pytest tests/python -q -p no:cacheprovider
 
