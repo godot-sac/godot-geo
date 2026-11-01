@@ -195,8 +195,8 @@ func geodetic_height(lat: float, lon: float) -> float:
 func raycast(from: Vector3, direction: Vector3, max_distance := 1.0e7) -> Dictionary:
 	if package == null:
 		return {"hit": false, "position": from, "distance": INF, "normal": Vector3.UP}
-	var r := GeoVisibility.raycast(package, _to_package(from), direction, max_distance)
-	r.position = _from_package(r.position)
+	var r := GeoVisibility.raycast(package, to_package_local(from), direction, max_distance)
+	r.position = from_package_local(r.position)
 	return r
 
 
@@ -212,21 +212,23 @@ func line_of_sight(a: Vector3, b: Vector3, refraction := 0.0) -> Dictionary:
 	if package == null:
 		return {"visible": true, "point": b, "distance": a.distance_to(b), "clearance": INF,
 				"clearance_point": a, "partial": true}
-	var r := GeoVisibility.line_of_sight(package, _to_package(a), _to_package(b), refraction)
-	r.point = _from_package(r.point)
-	r.clearance_point = _from_package(r.clearance_point)
+	var r := GeoVisibility.line_of_sight(package, to_package_local(a), to_package_local(b), refraction)
+	r.point = from_package_local(r.point)
+	r.clearance_point = from_package_local(r.clearance_point)
 	return r
 
 
 ## Visibility of the ground around the global eye position `observer`, out to `radius` metres: which points
 ## `target_height` above the surface it can see. Returns an Image (FORMAT_LA8, resolution x resolution) covering
 ## viewshed_rect(observer, radius): luminance 255 visible, 0 hidden; alpha 0 outside the radius or the package.
-## GDScript, about 2 * resolution^2 surface samples: run it on a worker thread for large resolutions.
+## GDScript, about 2 * resolution^2 surface samples (more when pixels are larger than the package spacing). On a
+## worker thread call GeoVisibility.viewshed(package, to_package_local(observer), ...) instead: node transforms may
+## only be read on the main thread.
 func viewshed(observer: Vector3, radius: float, target_height := 0.0, resolution := 256,
 		refraction := 0.0) -> Image:
 	if package == null:
 		return null
-	return GeoVisibility.viewshed(package, _to_package(observer), radius, target_height, resolution, refraction)
+	return GeoVisibility.viewshed(package, to_package_local(observer), radius, target_height, resolution, refraction)
 
 
 ## Global x / z rectangle (position = north-west corner, x east, y = z south) covered by viewshed().
@@ -251,11 +253,13 @@ func clear_overlay() -> void:
 		_backend.set_overlay(null, Rect2())
 
 
-func _to_package(p: Vector3) -> Vector3:
+## Global position -> package-local position (the frame of GeoVisibility and the package grid).
+func to_package_local(p: Vector3) -> Vector3:
 	return to_local(p) - Vector3(0.0, origin_offset, 0.0)
 
 
-func _from_package(p: Vector3) -> Vector3:
+## Package-local position -> global position.
+func from_package_local(p: Vector3) -> Vector3:
 	return to_global(p + Vector3(0.0, origin_offset, 0.0))
 
 
