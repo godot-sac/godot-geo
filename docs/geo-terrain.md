@@ -16,6 +16,7 @@ GeoTerrain                 loading, queries, collision, alignment with DisGeoOri
 | `backend` | `CDLOD` | renderer; only CDLOD so far |
 | `lod_distance` | 4.0 | level 0 range in patch sizes (64 cells); higher = sharper and slower, minimum 3.5 |
 | `cast_shadows` | true | |
+| `water` | true | draw the package's water layer (if any) as water; the water surface is the terrain itself, see [Water](#water) |
 | `ground_detail` | 0 | procedural detail on the ground near the camera (0–1); not data, it only breaks up the blur of 10 m imagery seen from a few metres. The demos use 0.6 |
 | `collision_enabled` | true | |
 | `collision_size` | 2000 | edge of the square collision patch, metres; it follows the target |
@@ -36,6 +37,7 @@ GeoTerrain                 loading, queries, collision, alignment with DisGeoOri
 | `viewshed_rect(observer, radius) -> Rect2` | global x / z square covered by `viewshed` |
 | `set_overlay(image, rect)` / `clear_overlay()` | RGBA image blended over the terrain colour in a global x / z rectangle |
 | `to_package_local(p)` / `from_package_local(p)` | global position <-> package frame (for `GeoVisibility` on a thread) |
+| `water_at(x, z) -> float` | share of the ground that is water there (0..1, from the water layer), 0 without one, `NAN` outside |
 | `attribution() -> PackedStringArray` | data notices to show with the terrain |
 | `is_loaded()`, signal `loaded` | |
 
@@ -95,6 +97,18 @@ GRASS GIS `r.viewshed` (Haverkort, Toma, Zhuang) was used as background reading 
 Demo: `demo/visibility.tscn` ([screenshot](visibility/viewshed.jpg)); `-- --check` prints a JSON report (viewshed
 time and visible share, lines of sight on three rings, their agreement with the viewshed, a ray cast) and exits 1
 if something is implausible.
+
+## Water
+A package built with `--layers water` has `water.png`, an anti-aliased coverage mask from OpenStreetMap water
+polygons (see [package format](package-format.md)). There is no separate water plane: Copernicus DEM sets the sea to
+0 m above EGM2008 and lakes to one level, and the package turns that into the local frame with the geoid and the
+Earth's curvature (about 70 m of drop at 30 km), so the terrain surface over water is already the water surface.
+`height_at`, `line_of_sight` and collision see the water surface; ships and other surface units clamped to the
+ground float on it. The renderer only changes the shading where the mask says water: the shoreline is cut at 50 %
+coverage with a one-pixel ramp (sharp at any distance), a sum of six travelling waves gives the normals near the
+camera (each wave fades out before it gets shorter than a few pixels, so the far sea does not show stripes),
+roughness rises with distance, a shallow tint follows the shore, and far away the water takes the imagery's tone.
+No bathymetry: the sea floor is not modelled.
 
 ## Alignment with godot-dis
 If the scene has a node in group `dis_geo_origin` (godot-dis `DisGeoOrigin`) — godot-geo does not depend on

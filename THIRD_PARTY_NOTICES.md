@@ -16,7 +16,7 @@ with pymap3d.
 
 ## Data (attribution carried by every terrain package and by derived screenshots)
 Packages are not in the repository, except the small test packages `tests/data/ankara_small/` (3.6 × 3.6 km),
-`tests/data/fiji_small/` and `tests/data/norway_small/` (3 × 3 km each), which contain modified Copernicus DEM and
+`tests/data/fiji_small/`, `tests/data/norway_small/` and `tests/data/uskudar_small/` (3 × 3 km each), which contain modified Copernicus DEM and
 Sentinel-2 data under the notices below (see their `terrain.json`). Packages built from your own files
 (`--dem`, `--imagery`) carry the notices you pass with `--attribution`.
 
@@ -36,6 +36,15 @@ older `docs/phase0` and `docs/phase2` sheets, which carry it in their documents)
 
 The release assets `godot-geo-terrain-*.zip` contain the same data; each package has an `ATTRIBUTION.txt` with its
 notices.
+
+### OpenStreetMap via Overture Maps (water layer)
+`build_terrain.py --layers water` reads Overture Maps `base/water` (from OpenStreetMap) and writes `water.png`, a
+Derivative Database of OpenStreetMap: it is licensed under the Open Database License 1.0
+(https://opendatacommons.org/licenses/odbl/1-0/), and anything that shows it must credit
+"© OpenStreetMap contributors, Overture Maps Foundation" (https://www.openstreetmap.org/copyright). This applies to
+`tests/data/uskudar_small/water.png` in this repository and to the water layer of any package; the rest of a
+package (DEM, imagery) keeps the notices above, and the code stays MIT. Screenshots of the terrain are Produced
+Works: the credit line is enough.
 
 ### EGM2008 and EGM96 geoids (NGA)
 Used through the PROJ grids `us_nga_egm08_25.tif` and `us_nga_egm96_15.tif` at package build time (public domain,

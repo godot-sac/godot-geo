@@ -1,7 +1,7 @@
 ## Visibility demo: line of sight to the point under the mouse and a viewshed overlay around an observer.
 ##   <godot> --path . res://demo/visibility.tscn [-- --package <dir>]
 ##   <godot> --path . res://demo/visibility.tscn -- --check [--report x.json] [--out <dir>]
-## Package: --package, else res://terrain/ankara, else the small test package.
+## Package: --package, else res://terrain/uskudar_10km, else res://terrain/ankara, else the small test package.
 ## Mouse: left click = place the observer on the ground (GeoTerrain.raycast from the camera), the line of sight runs to
 ## the point under the cursor (cyan up to the first obstruction, yellow beyond it; the viewshed overlay is green /
 ## red). Right mouse + WASD / Q E = fly, Shift = fast, wheel = speed.
@@ -11,7 +11,7 @@
 ## line of sight); prints a JSON report, exits 0 if plausible, 1 if not.
 extends Node3D
 
-const PACKAGES := ["res://terrain/ankara", "res://tests/data/ankara_small"]
+const PACKAGES := ["res://terrain/uskudar_10km", "res://terrain/ankara", "res://tests/data/ankara_small"]
 const REFRACTIONS := [0.0, 0.13, 0.25]
 const VISIBLE_COLOR := Color(0.2, 0.9, 1.0)  # line colours stand out against the green / red overlay
 const BLOCKED_COLOR := Color(1.0, 0.85, 0.1)

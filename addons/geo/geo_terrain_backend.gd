@@ -31,6 +31,11 @@ func set_ground_detail(_strength: float) -> void:
 	pass
 
 
+## Draw the package's water layer as water (if it has one); optional for a backend.
+func set_water(_enabled: bool) -> void:
+	pass
+
+
 ## RGBA texture blended over the terrain colour inside `rect` (local x / z); null removes it.
 func set_overlay(_texture: Texture2D, _rect: Rect2) -> void:
 	pass

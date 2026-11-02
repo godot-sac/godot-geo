@@ -1,0 +1,128 @@
+{
+  "format": "godot-geo-terrain",
+  "format_version": 1,
+  "generator": "godot-geo tools/build_terrain.py 0.1.0",
+  "created": "2026-11-02T16:17:35+00:00",
+  "origin": {
+    "latitude": 41.024,
+    "longitude": 29.012,
+    "height": 0.0
+  },
+  "frame": "local ENU tangent plane at the origin (WGS84); Godot +X east, +Y up, -Z north; row 0 = north edge, column 0 = west edge",
+  "size_m": 3000.0,
+  "height": {
+    "file": "height.exr",
+    "encoding": "OpenEXR float32, channel R, metres",
+    "samples": 201,
+    "spacing_m": 15.0,
+    "min": 36.961181640625,
+    "max": 135.4337158203125,
+    "reference": "ENU up relative to the origin; geoid and Earth curvature included",
+    "interpolation": "bilinear between samples",
+    "sha256": "646a67489eb43e66683541cb2db9024173b7ba6043282cc6efaf5bf63e0b6b05"
+  },
+  "color": {
+    "file": "color.png",
+    "encoding": "PNG RGB8, sRGB (Sentinel-2 L2A true colour (TCI))",
+    "samples": 201,
+    "spacing_m": 15.0,
+    "sha256": "5a82abc0b9b05c968e7f7552bf80795499715bb221f65e3703f37e2104c1ef3a"
+  },
+  "corners": {
+    "nw": {
+      "east": -1500.0,
+      "north": 1500.0,
+      "latitude": 41.03750550073346,
+      "longitude": 28.994161434289225
+    },
+    "ne": {
+      "east": 1500.0,
+      "north": 1500.0,
+      "latitude": 41.03750550073346,
+      "longitude": 29.029838565710804
+    },
+    "sw": {
+      "east": -1500.0,
+      "north": -1500.0,
+      "latitude": 41.01049170784453,
+      "longitude": 28.994168722179893
+    },
+    "se": {
+      "east": 1500.0,
+      "north": -1500.0,
+      "latitude": 41.01049170784453,
+      "longitude": 29.029831277820136
+    }
+  },
+  "sources": {
+    "elevation": {
+      "product": "Copernicus DEM GLO-30 (DSM)",
+      "vertical_datum": "EGM2008",
+      "access": "s3://copernicus-dem-30m",
+      "tiles": [
+        {
+          "name": "Copernicus_DSM_COG_10_N41_00_E028_00_DEM",
+          "sha256": "d33df50121e0bb20e4801d8901832e368f756d740a71343c6070313ed6246377"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N41_00_E029_00_DEM",
+          "sha256": "ae60579da4bcbc68cd853a22e70f46c2164a7360a4c53d7dc559a7434ad68e0d"
+        }
+      ]
+    },
+    "geoid": {
+      "model": "EGM2008",
+      "grid": "PROJ us_nga_egm08_25.tif (NGA, public domain)",
+      "n_min_m": 37.31411154114699,
+      "n_max_m": 37.34472544374809
+    },
+    "geoids": [
+      {
+        "model": "EGM2008",
+        "grid": "PROJ us_nga_egm08_25.tif (NGA, public domain)",
+        "n_min_m": 37.31411154114699,
+        "n_max_m": 37.34472544374809
+      }
+    ],
+    "imagery": {
+      "product": "Sentinel-2 L2A true colour (TCI)",
+      "access": "Earth Search STAC (earth-search.aws.element84.com/v1)",
+      "scenes": [
+        {
+          "id": "S2A_35TPF_20250722_0_L2A",
+          "datetime": "2025-07-22T09:09:14.808000Z",
+          "cloud_cover": 0.00349,
+          "coverage": 1.0
+        }
+      ]
+    }
+  },
+  "attribution": [
+    "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "Contains modified Copernicus Sentinel data 2025",
+    "© OpenStreetMap contributors, Overture Maps Foundation (ODbL 1.0, https://www.openstreetmap.org/copyright)"
+  ],
+  "disclaimer": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+  "water": {
+    "file": "water.png",
+    "encoding": "PNG L8, share of the cell covered by water (255 = all water), rows north to south",
+    "samples": 401,
+    "spacing_m": 7.5,
+    "source": {
+      "product": "Overture Maps base/water (OpenStreetMap)",
+      "release": "2026-10-21.0",
+      "access": "s3://overturemaps-us-west-2/release/2026-10-21.0/theme=base/type=water",
+      "subtypes": {
+        "canal": 1,
+        "ocean": 2,
+        "pond": 4,
+        "reservoir": 2,
+        "water": 3
+      },
+      "rows_sha256": "128d3534affc8c87aae8d2df6debe48e41e95fd3f028c304ab6b86e38cd3a53a"
+    },
+    "license": "ODbL-1.0 (derived from OpenStreetMap)",
+    "water_share": 0.5569057406359413,
+    "sha256": "2cfcd036a6148e1a5386992a55f7f849ce22194d85e9e80075be66cab468bf0a"
+  }
+}

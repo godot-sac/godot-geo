@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Versions follow [semver
 
 ## [Unreleased]
 ### Added
+- Water layer: `build_terrain.py --layers water [--water-spacing]` rasterises Overture Maps `base/water` polygons
+  (OpenStreetMap coastline, lakes, rivers; read with pyarrow from the public bucket, cached) into `water.png`, an
+  anti-aliased coverage mask; `--overture-release` pins the release. `GeoTerrain.water` draws it as water (wave
+  normals that fade before they alias, low roughness, shallow tint near the shore) on the terrain surface itself,
+  which is at the DEM's sea level there; `GeoTerrain.water_at()`, `GeoTerrainPackage.water_at()`.
+- Demo `demo/city.tscn`: camera bookmarks from `demo/places.json` (Üsküdar, Istanbul), `--place`, `--tour --out`
+  (one picture per bookmark + frame times), `demo/places_sheet.py` contact sheet. The visibility demo prefers
+  `terrain/uskudar_10km`.
+- Test package `tests/data/uskudar_small` (3 km, Üsküdar seafront, with water layer; ODbL for `water.png`).
 - `tools/build_terrain.py`: builds a terrain package (height EXR, Sentinel-2 colour PNG, `terrain.json`) on the local
   ENU grid at an origin, with EGM2008 geoid and Earth curvature; tests against GDAL, PROJ and godot-dis golden data.
 - `GeoTerrain` node: loads a package, draws it with a CDLOD renderer (geomorphing, per-node culling), `height_at`,

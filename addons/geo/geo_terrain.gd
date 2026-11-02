@@ -34,6 +34,13 @@ enum Backend { CDLOD }
 		ground_detail = value
 		if _backend:
 			_backend.set_ground_detail(value)
+## Draw the package's water layer (sea, lakes, rivers) as a water surface. The surface is the terrain itself: the
+## DEM is at water level there, so height_at() gives the water surface.
+@export var water := true:
+	set(value):
+		water = value
+		if _backend:
+			_backend.set_water(value)
 @export_group("Collision")
 @export var collision_enabled := true
 ## Edge length of the square collision patch kept around the target, in metres.
@@ -88,6 +95,7 @@ func load_package() -> Error:
 	_backend.build(package)
 	_backend.set_cast_shadows(_shadow_setting())
 	_backend.set_ground_detail(ground_detail)
+	_backend.set_water(water)
 	if collision_enabled and not Engine.is_editor_hint():
 		_body = StaticBody3D.new()
 		_body.name = "Collision"
@@ -154,6 +162,17 @@ func height_at(x: float, z: float) -> float:
 	if not package.contains(p.x, p.z):
 		return NAN
 	return global_position.y + origin_offset + _backend.surface_height(p.x, p.z)
+
+
+## Share of the ground around global x, z that is water (0..1, from the package's water layer); 0 without one,
+## NAN outside the package. Over water height_at() is the water surface.
+func water_at(x: float, z: float) -> float:
+	if package == null:
+		return NAN
+	var p := to_local(Vector3(x, 0.0, z))
+	if not package.contains(p.x, p.z):
+		return NAN
+	return package.water_at(p.x, p.z)
 
 
 ## Global position of a geodetic point (degrees, metres above the WGS84 ellipsoid) in this terrain's frame.

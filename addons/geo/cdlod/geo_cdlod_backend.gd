@@ -57,7 +57,18 @@ func build(pkg: GeoTerrainPackage) -> void:
 	_material.set_shader_parameter("morph_start", morph_start)
 	_material.set_shader_parameter("color_scale", pkg.spacing / pkg.color_spacing)
 	_material.set_shader_parameter("color_samples", float(pkg.color_samples))
+	if pkg.has_water():
+		var w := pkg.water.duplicate() as Image
+		w.generate_mipmaps()
+		_material.set_shader_parameter("water_map", ImageTexture.create_from_image(w))
+		_material.set_shader_parameter("water_scale", pkg.spacing / pkg.water_spacing)
+		_material.set_shader_parameter("water_samples", float(pkg.water_samples))
 	_mesh = patch_mesh(PATCH)
+
+
+func set_water(enabled: bool) -> void:
+	if _material:
+		_material.set_shader_parameter("water_enabled", enabled and package.has_water())
 
 
 func set_ground_detail(strength: float) -> void:

@@ -1,0 +1,98 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://demo/city.gd" id="1"]
+[ext_resource type="Script" path="res://addons/geo/geo_terrain.gd" id="2"]
+
+[sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
+sky_top_color = Color(0.3, 0.5, 0.8, 1)
+sky_horizon_color = Color(0.68, 0.75, 0.84, 1)
+ground_bottom_color = Color(0.6, 0.65, 0.72, 1)
+ground_horizon_color = Color(0.68, 0.75, 0.84, 1)
+sun_angle_max = 5.0
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("sky_mat")
+
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+ambient_light_energy = 0.45
+reflected_light_source = 2
+tonemap_mode = 4
+fog_enabled = true
+fog_mode = 0
+fog_light_color = Color(0.68, 0.74, 0.83, 1)
+fog_density = 2.5e-05
+fog_aerial_perspective = 0.5
+fog_sky_affect = 0.3
+
+[node name="City" type="Node3D"]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+light_color = Color(1, 0.96, 0.9, 1)
+light_energy = 1.7
+shadow_enabled = true
+directional_shadow_max_distance = 4000.0
+
+[node name="GeoTerrain" type="Node3D" parent="."]
+script = ExtResource("2")
+lod_distance = 6.0
+ground_detail = 0.6
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1000, 3000)
+near = 0.5
+far = 30000.0
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Info" type="Label" parent="HUD"]
+offset_left = 12.0
+offset_top = 10.0
+offset_right = 912.0
+offset_bottom = 60.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+
+[node name="Place" type="Label" parent="HUD"]
+offset_left = 12.0
+offset_top = 64.0
+offset_right = 912.0
+offset_bottom = 120.0
+theme_override_colors/font_color = Color(1, 0.95, 0.75, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 18
+
+[node name="PlaceList" type="ItemList" parent="HUD"]
+visible = false
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -340.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 330.0
+grow_horizontal = 0
+
+[node name="Attribution" type="Label" parent="HUD"]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = -64.0
+offset_right = -12.0
+offset_bottom = -8.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 0.85)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 11
+autowrap_mode = 3
+vertical_alignment = 2

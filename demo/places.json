@@ -1,0 +1,25 @@
+{
+  "comment": "Camera bookmarks for demo/city.tscn. target = ground point (WGS84 degrees); the camera looks along heading (degrees from north, clockwise) and pitch (degrees, negative = down) at the point target_height metres above that ground, from distance metres away. Positions come from OpenStreetMap (via Overture Maps 2026-10-21.0). No military sites. check = one of the reference views used for visual checks.",
+  "places": [
+    {"id": "bulgurlu", "name": "Bulgurlu (İzzettinbey Parkı)", "lat": 41.0214, "lon": 29.0805, "target_height": 0, "heading": 45, "pitch": -28, "distance": 450, "check": true,
+     "note": "Bulgurlu, Üsküdar: İzzettin Bey Sokağı and İzzettinbey Parkı, apartment blocks around the metro station."},
+    {"id": "capitol", "name": "Capitol AVM (Altunizade)", "lat": 41.02093, "lon": 29.03958, "target_height": 0, "heading": 80, "pitch": -28, "distance": 450, "check": true,
+     "note": "Capitol shopping centre, Bağlarbaşı / Altunizade (OSM footprint about 9 400 m²)."},
+    {"id": "uskudar_sahil", "name": "Üsküdar sahili (iskele)", "lat": 41.0268, "lon": 29.0160, "target_height": 0, "heading": 100, "pitch": -14, "distance": 550, "check": true,
+     "note": "Üsküdar seafront from the Bosphorus: ferry pier and Mihrimah Sultan Camii."},
+    {"id": "kiz_kulesi", "name": "Kız Kulesi", "lat": 41.02108, "lon": 29.00412, "target_height": 8, "heading": 228, "pitch": -9, "distance": 650, "check": false,
+     "note": "Maiden's Tower seen from the Salacak / Şemsi Paşa shore."},
+    {"id": "camlica_tower", "name": "Çamlıca TV-Radyo Kulesi", "lat": 41.01637, "lon": 29.06554, "target_height": 120, "heading": 10, "pitch": -8, "distance": 1300, "check": false,
+     "note": "Küçük Çamlıca TV and radio tower (OSM: 369 m)."},
+    {"id": "camlica_mosque", "name": "Büyük Çamlıca Camii", "lat": 41.03436, "lon": 29.07037, "target_height": 0, "heading": 20, "pitch": -22, "distance": 750, "check": false,
+     "note": "Çamlıca Mosque on the slope of Büyük Çamlıca hill."},
+    {"id": "bridge_15_temmuz", "name": "15 Temmuz Şehitler Köprüsü", "lat": 41.0455, "lon": 29.0345, "target_height": 60, "heading": 335, "pitch": -10, "distance": 2200, "check": false,
+     "note": "Bosphorus Bridge from the south, over the water."},
+    {"id": "kuzguncuk", "name": "Kuzguncuk", "lat": 41.0345, "lon": 29.0310, "target_height": 0, "heading": 75, "pitch": -15, "distance": 500, "check": false,
+     "note": "Kuzguncuk shore and its valley."},
+    {"id": "beylerbeyi", "name": "Beylerbeyi Sarayı", "lat": 41.04272, "lon": 29.04004, "target_height": 0, "heading": 120, "pitch": -15, "distance": 550, "check": false,
+     "note": "Beylerbeyi Palace on the Asian shore, below the bridge."},
+    {"id": "overview", "name": "Genel bakış (Üsküdar ve Boğaz)", "lat": 41.02, "lon": 29.05, "target_height": 0, "heading": 300, "pitch": -32, "distance": 6500, "check": false,
+     "note": "Üsküdar, the Bosphorus and the European shore from the south-east."}
+  ]
+}

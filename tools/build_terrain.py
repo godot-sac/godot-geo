@@ -14,7 +14,8 @@ component of the terrain surface point whose ENU east/north are those of the sam
 `origin_height` (ellipsoidal). The geoid and Earth curvature are therefore baked in, and DIS ECEF positions
 converted with the same origin land on the surface.
 
-Package (directory): height.exr (float32, channel R), color.png (RGB8), terrain.json (see write_package).
+Package (directory): height.exr (float32, channel R), color.png (RGB8), terrain.json (see write_package), and
+the optional layers of --layers (tools/layers.py), e.g. water.png.
 Downloads are cached in tools/.cache/ (DEM tiles, Sentinel-2 windows, geoid grids from --fetch-geoid). GDAL,
 rasterio and PROJ are used here only; the Godot addon reads the package with engine APIs.
 """
@@ -42,6 +43,7 @@ from rasterio.windows import Window, from_bounds
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I leaves the script directory off sys.path
 import dted  # noqa: E402
+import layers as geo_layers  # noqa: E402
 
 VERSION = "0.1.0"
 PACKAGE_FORMAT = "godot-geo-terrain"
@@ -886,10 +888,13 @@ class Sources:
 
 
 def write_package(out: Path, grid: Grid, color_grid: Grid, height: np.ndarray, color: np.ndarray,
-                  sources: Sources) -> dict:
+                  sources: Sources, extra: list | None = None) -> dict:
+    """`extra`: optional layers (layers.Layer), written as 8-bit PNGs and listed under their own keys."""
     out.mkdir(parents=True, exist_ok=True)
     write_exr(out / "height.exr", height)
     Image.fromarray(color).save(out / "color.png")
+    for layer in extra or []:
+        Image.fromarray(layer.image, mode="L").save(out / layer.file)
     meta = {
         "format": PACKAGE_FORMAT,
         "format_version": PACKAGE_FORMAT_VERSION,
@@ -922,6 +927,8 @@ def write_package(out: Path, grid: Grid, color_grid: Grid, height: np.ndarray, c
         "attribution": sources.attribution,
         "disclaimer": sources.disclaimer,
     }
+    for layer in extra or []:
+        meta[layer.key] = {"file": layer.file} | layer.meta | {"sha256": sha256_file(out / layer.file)}
     (out / "terrain.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
                                       newline="\n")
     gdignore = out.parent / ".gdignore"  # keep the Godot editor from importing big package files under res://
@@ -982,11 +989,19 @@ def build(args: argparse.Namespace) -> dict:
                    "access": "Earth Search STAC (earth-search.aws.element84.com/v1)", "scenes": scenes}
         years = sorted({s["datetime"][:4] for s in scenes})
         attribution.append(f"Contains modified Copernicus Sentinel data {', '.join(years)}")
+    extra = []
+    if args.layers:
+        layer_grids = {"water": Grid(args.lat, args.lon, args.origin_height, args.size,
+                                     args.water_spacing or color_grid.spacing)}
+        extra = geo_layers.build_layers(args.layers, layer_grids.__getitem__, grid_bounds(grid),
+                                        args.overture_release, CACHE, network, log, sha256_file)
+        for layer in extra:
+            attribution += [a for a in layer.attribution if a not in attribution]
     attribution += args.attribution or []
     if (args.dem or args.imagery not in (None, ["hillshade"])) and not args.attribution:
         log("  note: no --attribution given; add the notice your data's licence requires")
     meta = write_package(Path(args.out), grid, color_grid, height, color,
-                         Sources(elevation, geoids, imagery, attribution, disclaimer))
+                         Sources(elevation, geoids, imagery, attribution, disclaimer), extra)
     log(f"done in {time.time() - t0:.0f} s: {args.out} (heights {meta['height']['min']:.1f} .. "
         f"{meta['height']['max']:.1f} m)")
     if NETWORK_USED:
@@ -1024,6 +1039,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     g.add_argument("--year", type=int, default=2025, help="summer (Jun-Aug) to take Sentinel-2 scenes from")
     g.add_argument("--max-cloud", type=float, default=5.0, help="maximum scene cloud cover (%%)")
     g.add_argument("--scene", action="append", help="use this Sentinel-2 scene id (repeatable) instead of searching")
+    g = ap.add_argument_group("layers (optional; vector data from Overture Maps, downloaded once and cached)")
+    g.add_argument("--layers", type=lambda v: [x for x in v.split(",") if x], default=[],
+                   help=f"comma-separated: {', '.join(geo_layers.LAYERS)}")
+    g.add_argument("--water-spacing", type=float, default=None,
+                   help="spacing of the water mask (m, default = colour spacing); finer gives a sharper shoreline")
+    g.add_argument("--overture-release", default=geo_layers.OVERTURE_RELEASE,
+                   help=f"Overture Maps release to read (default {geo_layers.OVERTURE_RELEASE})")
     ap.add_argument("--attribution", action="append", metavar="TEXT",
                     help="notice required by your data's licence (repeatable); stored in terrain.json")
     ap.add_argument("--offline", action="store_true", help="fail instead of using the network (cached data is fine)")
@@ -1033,6 +1055,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     missing = [f"--{k}" for k in ("lat", "lon", "size", "out") if getattr(args, k) is None]
     if missing:
         ap.error(f"the following arguments are required: {', '.join(missing)}")
+    unknown = [x for x in args.layers if x not in geo_layers.LAYERS]
+    if unknown:
+        ap.error(f"unknown layer(s) {', '.join(unknown)}; choose from {', '.join(geo_layers.LAYERS)}")
     if args.imagery and "hillshade" in args.imagery and len(args.imagery) > 1:
         ap.error("--imagery hillshade cannot be combined with files")
     return args

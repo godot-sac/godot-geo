@@ -8,6 +8,7 @@ A package is a directory written by `tools/build_terrain.py` and read by Godot w
 | `height.exr` | OpenEXR, one float32 channel `R` (ZIP compressed), metres. Loads as `Image.FORMAT_RF`. |
 | `color.png` | RGB8, sRGB, Sentinel-2 L2A true colour. |
 | `terrain.json` | Metadata, below. |
+| `water.png` | Optional (`--layers water`): L8, share of each cell covered by water, 255 = all water. |
 
 ## Grid and frame
 Both rasters are square grids centred on the origin, `size_m` wide, sampled at their own `spacing_m`
@@ -57,6 +58,21 @@ height at its `x, z` (when the scene origin equals the package origin). Between 
   "coverage"}]}`, or `{"product": "hillshade computed from the heights"}`.
 - `attribution` lists only the notices of the data actually used, plus any `--attribution` text. Longitudes in
   `corners` are in [-180, 180), so across the antimeridian the west corners can have larger values than the east ones.
+
+Optional layers have their own key, file and grid (same frame, centred on the origin, own `spacing_m`):
+```jsonc
+  "water": {"file": "water.png", "encoding": "PNG L8, share of the cell covered by water (255 = all water), ...",
+            "samples": 4001, "spacing_m": 2.5,
+            "source": {"product": "Overture Maps base/water (OpenStreetMap)", "release": "2026-10-21.0",
+                       "access": "s3://overturemaps-us-west-2/...", "subtypes": {"ocean": 4, "...": 0},
+                       "rows_sha256": "..."},
+            "license": "ODbL-1.0 (derived from OpenStreetMap)", "water_share": 0.208, "sha256": "..."}
+```
+A cell is the `spacing_m` square centred on its sample; the value is the covered share computed with 4 × 4
+supersampling, so sampling it bilinearly and cutting at 0.5 gives the shoreline to a fraction of a cell. Water
+polygons are Overture `base/water` subtypes ocean, lake, pond, reservoir, river, water, canal and stream (swimming
+pools and named sea areas are left out). The file is derived from OpenStreetMap and licensed under ODbL 1.0; the
+package's `attribution` then includes "© OpenStreetMap contributors, Overture Maps Foundation".
 
 Readers must check `format` and `format_version`; additions within version 1 are new keys only.
 Anything that shows the terrain (a game, a screenshot, a video) must show the `attribution` lines.

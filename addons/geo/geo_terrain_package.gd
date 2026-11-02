@@ -25,6 +25,10 @@ var color_spacing := 0.0
 var color_samples := 0
 var height_min := 0.0
 var height_max := 0.0
+## Optional water layer (terrain.json "water"): coverage 0..255, FORMAT_L8, row 0 = north edge; null if absent.
+var water: Image
+var water_samples := 0
+var water_spacing := 0.0
 
 
 ## Loads the package directory `dir` (res://, user:// or absolute). With `verify` the SHA-256 of each file is checked.
@@ -80,7 +84,38 @@ func _load(dir: String, verify: bool) -> String:
 	color = Image.load_from_file(_global(dir.path_join(meta.color.file)))
 	if color == null or color.get_size() != Vector2i(color_samples, color_samples):
 		return "%s: missing or wrong size" % meta.color.file
+
+	if meta.has("water"):
+		var file := dir.path_join(meta.water.file)
+		if verify and FileAccess.get_sha256(file) != meta.water.sha256:
+			return "%s: SHA-256 does not match terrain.json" % file
+		water = Image.load_from_file(_global(file))
+		water_samples = int(meta.water.samples)
+		water_spacing = float(meta.water.spacing_m)
+		if water == null or water.get_size() != Vector2i(water_samples, water_samples):
+			return "%s: missing or wrong size" % meta.water.file
+		water.convert(Image.FORMAT_L8)
 	return ""
+
+
+func has_water() -> bool:
+	return water != null
+
+
+## Share of the cell around local x, z covered by water (0..1, bilinear), 0 without a water layer.
+func water_at(x: float, z: float) -> float:
+	if water == null:
+		return 0.0
+	var half := size_m * 0.5
+	var px := clampf((x + half) / water_spacing, 0.0, water_samples - 1.0)
+	var pz := clampf((z + half) / water_spacing, 0.0, water_samples - 1.0)
+	var c := mini(int(px), water_samples - 2)
+	var r := mini(int(pz), water_samples - 2)
+	var fx := px - c
+	var fz := pz - r
+	var a := lerpf(water.get_pixel(c, r).r, water.get_pixel(c + 1, r).r, fx)
+	var b := lerpf(water.get_pixel(c, r + 1).r, water.get_pixel(c + 1, r + 1).r, fx)
+	return lerpf(a, b, fz)
 
 
 static func _global(p: String) -> String:
