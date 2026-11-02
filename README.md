@@ -5,7 +5,7 @@ WGS84-based local frame shared with godot-dis (DIS, IEEE 1278.1), with line-of-s
 
 > **Status:** in development, not released yet. APIs may change before v0.1.0.
 
-![3D DIS demo on the terrain of Ankara](docs/demo3d/overview.jpg)
+![Line of sight and viewshed on the terrain south-east of Ankara](docs/media/visibility.gif)
 
 <sub>Contains modified Copernicus Sentinel data 2025. Elevation produced using Copernicus WorldDEM-30 © DLR e.V.
 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all
@@ -40,14 +40,23 @@ rights reserved.</sub>
   entities on the terrain.
 
 ## Requirements
-- Godot 4.7 (the addon uses engine APIs available since 4.3, untested there).
+- Godot 4.7 (the addon uses engine APIs available since 4.3, untested there). Tested on Windows and Linux with the
+  Forward+, Mobile and Compatibility renderers; macOS not yet. Details: [compatibility table](docs/compatibility.md).
 - For building packages: Python 3.12+ and the packages in `tools/requirements.txt` (rasterio, pyproj, pymap3d,
   numpy, OpenEXR, Pillow). These are build-time tools only; nothing of them is in the addon. Downloading open data
   uses the public AWS buckets of Copernicus DEM and Earth Search and the PROJ CDN (no account needed); building from
   your own files works offline.
 
 ## Installation
-Copy `addons/geo/` into your project. No plugin needs to be enabled; the classes are global.
+From the [releases page](https://github.com/OWNER/godot-geo/releases):
+- `godot-geo-<version>.zip`: unzip into your project; it contains `addons/geo/`. No plugin needs to be enabled; the
+  classes are global.
+- Prebuilt terrain packages, each unzipping to `terrain/<name>/` with an `ATTRIBUTION.txt`:
+  `godot-geo-terrain-ankara-40km.zip` (40 × 40 km at 10 m, 90 MB) and `godot-geo-terrain-samples.zip` (three
+  3 km test packages: Ankara, Fiji across 180°, Norway at 70° N).
+
+Or copy `addons/geo/` from a clone of this repository. [Getting started](docs/getting-started.md) goes from an empty
+project to terrain with a line-of-sight query step by step.
 
 ## Usage
 Build a package (40 × 40 km around Ankara at 10 m; about 30 s once the downloads are cached):
@@ -82,15 +91,18 @@ Limits: one package at a time, no streaming; packages are read from the file sys
 ## Demos
 - `demo/terrain_view.tscn`: terrain with sun, sky and haze; free camera.
 - `demo/visibility.tscn`: line of sight to the point under the mouse, viewshed overlay around an observer, `--check`
-  report ([screenshot](docs/visibility/viewshed.jpg)).
-- `demo/dis3d.tscn`: a DIS exercise in 3D with godot-dis and godot-milsymbol, with debug and test tools. Setup:
-  [docs/demo-3d.md](docs/demo-3d.md).
+  report ([screenshot](docs/visibility/viewshed.jpg)). `demo/visibility_tour.tscn` is a scripted run of it that
+  recorded the animation above.
+- `demo/dis3d.tscn`: a DIS exercise in 3D with godot-dis and godot-milsymbol, with debug and test tools
+  ([screenshot](docs/demo3d/overview.jpg)). Setup: [docs/demo-3d.md](docs/demo-3d.md).
 
 ## Documentation
+- [Getting started](docs/getting-started.md): empty project to terrain and line of sight in about 15 minutes
 - [GeoTerrain API and renderer](docs/geo-terrain.md)
 - [Packages from your own data](docs/own-data.md) (DTED, GeoTIFF, vertical datum, offline use)
 - [Terrain package format](docs/package-format.md)
 - [3D DIS demo](docs/demo-3d.md)
+- [Compatibility](docs/compatibility.md) (tested Godot versions and platforms)
 - [Phase 0 findings](docs/phase0.md) (data sources, vertical datum, renderer comparison)
 - [Plan](PLAN.md) (in Turkish) and [changelog](CHANGELOG.md)
 
@@ -102,6 +114,13 @@ tools/.venv/Scripts/python -m pytest tests/python -q -p no:cacheprovider     # p
 ```
 The Python tests compare packages with independent references (GDAL sampling, PROJ geoid grid, pymap3d golden
 data). See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Release assets (into `build/release/`, not in git; CI attaches them to a draft release on `v*` tags):
+```sh
+tools/.venv/Scripts/python -I tools/package_release.py --version 0.1.0 --terrain     # addon, terrain zips, SHA256SUMS
+python tools/check_package.py build/release/godot-geo-0.1.0.zip build/release/godot-geo-terrain-samples.zip --godot <godot>
+```
+`tools/check_package.py` installs the zips into a new, empty project and runs the queries there.
 
 ## Contributing
 Bug reports, questions and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the

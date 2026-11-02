@@ -29,7 +29,13 @@ data:
 
 ### Copernicus Sentinel-2
 Full, free and open access (Copernicus data policy). Required notice: "Contains modified Copernicus Sentinel data
-[year]". `docs/phase0/*.jpg`, `docs/phase2/*.jpg`, `docs/demo3d/*.jpg` and `docs/visibility/*.jpg` contain modified Copernicus Sentinel data 2025 and the Copernicus DEM notice above.
+[year]". `docs/phase0/*.jpg`, `docs/phase2/*.jpg`, `docs/demo3d/*.jpg`, `docs/visibility/*.jpg`,
+`docs/getting-started/*.jpg`, `docs/media/visibility.gif` and `docs/media/social-preview.jpg` contain modified
+Copernicus Sentinel data 2025 and the Copernicus DEM notice above (shown in the pictures themselves, except the
+older `docs/phase0` and `docs/phase2` sheets, which carry it in their documents).
+
+The release assets `godot-geo-terrain-*.zip` contain the same data; each package has an `ATTRIBUTION.txt` with its
+notices.
 
 ### EGM2008 and EGM96 geoids (NGA)
 Used through the PROJ grids `us_nga_egm08_25.tif` and `us_nga_egm96_15.tif` at package build time (public domain,

@@ -27,6 +27,9 @@ var target := Vector3.INF
 var viewshed_ms := -1.0
 var viewshed_visible := -1.0
 var show_info := true
+## Drives the line of sight instead of the mouse when set (demo/visibility_tour.gd).
+var scripted_target := Vector3.INF
+var show_fps := true
 var _speed := 300.0
 var _task := -1
 var _task_result: Image
@@ -135,6 +138,12 @@ func start_viewshed() -> void:
 	_task = WorkerThreadPool.add_task(func(): _task_result = GeoVisibility.viewshed(pkg, eye, r, th, res, k))
 
 
+## Computes the viewshed and waits for it (stalls the frame).
+func viewshed_now() -> void:
+	start_viewshed()
+	_finish_viewshed()
+
+
 func _finish_viewshed() -> void:
 	WorkerThreadPool.wait_for_task_completion(_task)
 	_task = -1
@@ -167,6 +176,8 @@ func _process(delta: float) -> void:
 		float(Input.is_key_pressed(KEY_S)) - float(Input.is_key_pressed(KEY_W)))
 	camera.translate(dir * _speed * (5.0 if Input.is_key_pressed(KEY_SHIFT) else 1.0) * delta)
 	var hit := {} if _checking else _cursor_hit()
+	if scripted_target != Vector3.INF:
+		hit = {"hit": true, "position": scripted_target}
 	if hit.get("hit", false):
 		target = hit.position
 		var t := target + Vector3(0.0, target_height, 0.0)
@@ -237,7 +248,8 @@ func _update_info() -> void:
 				viewshed_visible * 100.0])
 	else:
 		lines.append("viewshed radius %.0f m (V)" % radius)
-	lines.append("%d fps" % Engine.get_frames_per_second())
+	if show_fps:
+		lines.append("%d fps" % Engine.get_frames_per_second())
 	info.text = "\n".join(lines)
 
 

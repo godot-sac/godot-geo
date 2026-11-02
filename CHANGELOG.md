@@ -29,8 +29,18 @@ All notable changes to this project are documented here. Versions follow [semver
 - Demo `demo/visibility.tscn`: line of sight under the mouse, viewshed overlay, `--check` report; positions as MGRS.
 - `GeoMath`: UTM (Krüger series, Norway / Svalbard zones) and MGRS conversions, tested against PROJ and the `mgrs`
   package (golden file).
+- Release assets: `tools/package_release.py` packs the addon zip (`addons/geo/` with licence files), prebuilt
+  terrain packages (Ankara 40 km with a pinned Sentinel-2 scene; Ankara, Fiji and Norway test packages) with
+  `ATTRIBUTION.txt` and `.gdignore`, and `SHA256SUMS.txt`; `tools/check_package.py` installs them into an empty
+  project and runs the queries. CI runs the check and attaches the assets to a draft release on `v*` tags.
+- `docs/getting-started.md`: empty project to terrain with line of sight and a viewshed, from the release zips;
+  `docs/compatibility.md`: what was tested on which Godot version, platform and renderer.
+- `demo/visibility_tour.tscn`: scripted run of the visibility demo for the README animation and the social preview
+  (`--poster`); `tools/make_gif.py` turns Movie Maker frames into a small GIF. `docs/media/`: animation, social
+  preview image (1280 × 640), icon.
 
 ### Changed
+- Visibility demo: the attribution wraps to the window width instead of being cut off on narrow windows.
 - Sentinel-2 scenes whose true-colour asset is not a public COG (requester-pays JPEG 2000) are skipped; when none is
   left, Earth Search Collection 1 is searched.
 
