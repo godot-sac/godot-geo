@@ -20,6 +20,22 @@
     {"id": "beylerbeyi", "name": "Beylerbeyi Sarayı", "lat": 41.04272, "lon": 29.04004, "target_height": 0, "heading": 120, "pitch": -15, "distance": 550, "check": false,
      "note": "Beylerbeyi Palace on the Asian shore, below the bridge."},
     {"id": "overview", "name": "Genel bakış (Üsküdar ve Boğaz)", "lat": 41.02, "lon": 29.05, "target_height": 0, "heading": 300, "pitch": -32, "distance": 6500, "check": false,
-     "note": "Üsküdar, the Bosphorus and the European shore from the south-east."}
+     "note": "Üsküdar, the Bosphorus and the European shore from the south-east."},
+    {"id": "fsm_bridge", "name": "Fatih Sultan Mehmet Köprüsü", "lat": 41.0911, "lon": 29.0611, "target_height": 60, "heading": 20, "pitch": -12, "distance": 2200, "check": false,
+     "note": "Second Bosphorus bridge, Kavacık to Hisarüstü (60 km package)."},
+    {"id": "yss_bridge", "name": "Yavuz Sultan Selim Köprüsü", "lat": 41.2028, "lon": 29.1119, "target_height": 60, "heading": 330, "pitch": -12, "distance": 3000, "check": false,
+     "note": "Third Bosphorus bridge near the Black Sea entrance (60 km package)."},
+    {"id": "kadikoy", "name": "Kadıköy ve Haydarpaşa", "lat": 40.9950, "lon": 29.0210, "target_height": 0, "heading": 30, "pitch": -18, "distance": 1500, "check": false,
+     "note": "Kadıköy pier and Haydarpaşa station from the south (60 km package)."},
+    {"id": "historic_peninsula", "name": "Tarihi Yarımada (Ayasofya, Sultanahmet)", "lat": 41.0080, "lon": 28.9790, "target_height": 0, "heading": 300, "pitch": -20, "distance": 1800, "check": false,
+     "note": "Hagia Sophia and the Blue Mosque from over the Bosphorus mouth (60 km package)."},
+    {"id": "galata", "name": "Galata Kulesi ve Haliç", "lat": 41.0256, "lon": 28.9741, "target_height": 30, "heading": 320, "pitch": -15, "distance": 1500, "check": false,
+     "note": "Galata Tower and the Golden Horn (60 km package)."},
+    {"id": "levent", "name": "Levent silueti", "lat": 41.0830, "lon": 29.0100, "target_height": 80, "heading": 330, "pitch": -5, "distance": 4500, "check": false,
+     "note": "The Levent / Maslak towers seen from over the Bosphorus (60 km package)."},
+    {"id": "sabiha_gokcen", "name": "Sabiha Gökçen Havalimanı", "lat": 40.8986, "lon": 29.3092, "target_height": 0, "heading": 60, "pitch": -15, "distance": 3000, "check": false,
+     "note": "Istanbul Sabiha Gökçen airport (LTFJ) from the south-west (60 km package)."},
+    {"id": "buyukada", "name": "Büyükada", "lat": 40.8650, "lon": 29.1250, "target_height": 0, "heading": 180, "pitch": -15, "distance": 4000, "check": false,
+     "note": "The Princes' Islands from the north (60 km package)."}
   ]
 }

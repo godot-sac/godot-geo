@@ -37,7 +37,7 @@ environment = SubResource("env")
 light_color = Color(1, 0.96, 0.9, 1)
 light_energy = 1.7
 shadow_enabled = true
-directional_shadow_max_distance = 4000.0
+directional_shadow_max_distance = 2500.0
 
 [node name="GeoTerrain" type="Node3D" parent="."]
 script = ExtResource("2")

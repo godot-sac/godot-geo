@@ -34,6 +34,8 @@ var _tiles := {}  # Vector3i(i, j, lod) -> MeshInstance3D (null when the tile ha
 var _tasks := {}  # Vector3i -> WorkerThreadPool task preparing the arrays
 var _results := {}  # Vector3i -> arrays from a finished task (filled on the worker, read on the main thread)
 var _lock := Mutex.new()
+var _todo: Array[Vector3i] = []  # missing tiles, nearest first, from the last scan
+var _todo_cam := Vector2(INF, INF)
 var _wall_mat: ShaderMaterial
 var _roof_mat: ShaderMaterial
 
@@ -44,6 +46,8 @@ func has_data() -> bool:
 
 func _rebuild() -> void:
 	_wait_tasks()
+	_todo.clear()
+	_todo_cam = Vector2(INF, INF)
 	for mi in _tiles.values():
 		if mi:
 			mi.queue_free()
@@ -70,6 +74,45 @@ func update_view(camera: Vector3) -> void:
 	if data == null:
 		return
 	var cam := Vector2(camera.x, camera.z)
+	var sync := build_budget_ms == INF
+	# The scan over all tiles in range (thousands at 12 km) runs only when the camera has moved a little.
+	if sync or cam.distance_to(_todo_cam) > 100.0:
+		_todo_cam = cam
+		_scan(cam)
+	if sync:
+		for key in _todo:
+			if not _tasks.has(key):
+				var arrays: Variant = _arrays(key)
+				var m: ArrayMesh = null
+				if arrays != null:
+					m = ArrayMesh.new()
+					for a: Array in arrays:
+						m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
+				_add_tile(key, m)
+		_todo.clear()
+		return
+	var t0 := Time.get_ticks_usec()
+	for key: Vector3i in _tasks.keys():
+		if not WorkerThreadPool.is_task_completed(_tasks[key]):
+			continue
+		WorkerThreadPool.wait_for_task_completion(_tasks[key])
+		_tasks.erase(key)
+		_lock.lock()
+		var mesh: ArrayMesh = _results.get(key)
+		_results.erase(key)
+		_lock.unlock()
+		if data.tile_center(key.x, key.y).distance_to(cam) < _range(key.z) + data.tile_m:
+			_add_tile(key, mesh)
+		if (Time.get_ticks_usec() - t0) / 1000.0 > build_budget_ms:
+			break
+	while _tasks.size() < MAX_TASKS and not _todo.is_empty():
+		var key: Vector3i = _todo.pop_front()
+		if not _tasks.has(key) and not _tiles.has(key):
+			_tasks[key] = WorkerThreadPool.add_task(_prepare.bind(key))
+
+
+## Frees tiles out of range and lists the missing ones, nearest first (the near level before the far one).
+func _scan(cam: Vector2) -> void:
 	for key: Vector3i in _tiles.keys():
 		if data.tile_center(key.x, key.y).distance_to(cam) > _range(key.z) + data.tile_m:
 			var mi: MeshInstance3D = _tiles[key]
@@ -93,30 +136,7 @@ func update_view(camera: Vector3) -> void:
 	todo.sort_custom(func(a: Vector3i, b: Vector3i) -> bool:
 		return data.tile_center(a.x, a.y).distance_squared_to(cam) + a.z * 1.0e6 \
 				< data.tile_center(b.x, b.y).distance_squared_to(cam) + b.z * 1.0e6)
-	if build_budget_ms == INF:  # synchronous (build_all_around)
-		for key in todo:
-			if not _tasks.has(key):
-				_add_tile(key, _arrays(key))
-		return
-	var t0 := Time.get_ticks_usec()
-	for key: Vector3i in _tasks.keys():
-		if not WorkerThreadPool.is_task_completed(_tasks[key]):
-			continue
-		WorkerThreadPool.wait_for_task_completion(_tasks[key])
-		_tasks.erase(key)
-		_lock.lock()
-		var arrays: Variant = _results.get(key)
-		_results.erase(key)
-		_lock.unlock()
-		if data.tile_center(key.x, key.y).distance_to(cam) < _range(key.z) + data.tile_m:
-			_add_tile(key, arrays)
-		if (Time.get_ticks_usec() - t0) / 1000.0 > build_budget_ms:
-			break
-	for key in todo:
-		if _tasks.size() >= MAX_TASKS:
-			break
-		if not _tasks.has(key) and not _tiles.has(key):  # may have been added just above
-			_tasks[key] = WorkerThreadPool.add_task(_prepare.bind(key))
+	_todo = todo
 
 
 func _arrays(key: Vector3i) -> Variant:
@@ -138,9 +158,16 @@ func _exit_tree() -> void:
 
 
 func _prepare(key: Vector3i) -> void:
+	# The mesh is created here too: RenderingServer calls are thread-safe, and uploading a large tile on the main
+	# thread cost up to 13 ms in the 60 km package.
 	var arrays: Variant = _arrays(key)
+	var mesh: ArrayMesh = null
+	if arrays != null:
+		mesh = ArrayMesh.new()
+		for a: Array in arrays:
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
 	_lock.lock()
-	_results[key] = arrays
+	_results[key] = mesh
 	_lock.unlock()
 
 
@@ -152,15 +179,12 @@ func build_all_around(camera: Vector3) -> void:
 	build_budget_ms = budget
 
 
-func _add_tile(key: Vector3i, arrays: Variant) -> void:
+func _add_tile(key: Vector3i, mesh: ArrayMesh) -> void:
 	var center := data.tile_center(key.x, key.y)
 	tiles_built += 1
-	if arrays == null:
+	if mesh == null:
 		_tiles[key] = null
 		return
-	var mesh := ArrayMesh.new()
-	for a: Array in arrays:
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.set_surface_override_material(0, _wall_mat)

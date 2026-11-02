@@ -133,6 +133,18 @@ func update_view(camera: Vector3) -> void:
 
 func _prepare(key: Vector2i) -> void:
 	var prepared := prepare_chunk(key)
+	# Upload the instance buffers here as well (RenderingServer calls are thread-safe).
+	if prepared.count > 0:
+		var far := _multimesh(null, prepared.count)
+		far.mesh = _impostor_mesh
+		far.buffer = prepared.far
+		prepared.far_mm = far
+		var near := []
+		for item: Array in prepared.near:
+			var mm := _multimesh(_meshes[item[0]], item[2])
+			mm.buffer = item[1]
+			near.append(mm)
+		prepared.near_mm = near
 	_lock.lock()
 	_results[key] = prepared
 	_lock.unlock()
@@ -248,12 +260,17 @@ func _add_chunk(key: Vector2i, prepared: Dictionary) -> void:
 	if count == 0:
 		return
 	var center := _chunk_center(key)
-	var far_mm := _multimesh(null, count)
-	far_mm.mesh = _impostor_mesh
-	far_mm.buffer = prepared.far
-	for item: Array in prepared.near:
-		var mm := _multimesh(_meshes[item[0]], item[2])
-		mm.buffer = item[1]
+	var far_mm: MultiMesh = prepared.get("far_mm")
+	if far_mm == null:
+		far_mm = _multimesh(null, count)
+		far_mm.mesh = _impostor_mesh
+		far_mm.buffer = prepared.far
+	for k in prepared.near.size():
+		var item: Array = prepared.near[k]
+		var mm: MultiMesh = prepared.near_mm[k] if prepared.has("near_mm") else null
+		if mm == null:
+			mm = _multimesh(_meshes[item[0]], item[2])
+			mm.buffer = item[1]
 		var near := MultiMeshInstance3D.new()
 		near.multimesh = mm
 		near.material_override = _tree_material

@@ -83,7 +83,7 @@ func run_check(report_path: String) -> void:
 		# From 40 m above the water off the Üsküdar seafront to a street behind the first row of buildings: the slope faces the
 		# sea, so only the buildings hide it.
 		["ferry_to_street_behind_seafront", _ground_point(41.0268, 29.0100, 40.0), _ground_point(41.0255, 29.0190, 2.0),
-				false, "building", true],
+				false, "building", null],  # terrain-only result depends on the grid spacing (5 m vs 10 m)
 		["street_bulgurlu_to_capitol", _ground_point(41.0166, 29.0755, 1.7), _ground_point(41.02093, 29.03958, 2.0),
 				false, "", null],
 		["across_the_bosphorus", _ground_point(41.0300, 29.0060, 5.0), _ground_point(41.0420, 29.0220, 5.0), true, "",
