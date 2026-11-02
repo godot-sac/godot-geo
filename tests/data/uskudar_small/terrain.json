@@ -2,7 +2,7 @@
   "format": "godot-geo-terrain",
   "format_version": 1,
   "generator": "godot-geo tools/build_terrain.py 0.1.0",
-  "created": "2026-11-02T16:17:35+00:00",
+  "created": "2026-11-02T17:21:38+00:00",
   "origin": {
     "latitude": 41.024,
     "longitude": 29.012,
@@ -15,11 +15,17 @@
     "encoding": "OpenEXR float32, channel R, metres",
     "samples": 201,
     "spacing_m": 15.0,
-    "min": 36.961181640625,
-    "max": 135.4337158203125,
+    "min": 29.031368255615234,
+    "max": 127.4337158203125,
     "reference": "ENU up relative to the origin; geoid and Earth curvature included",
     "interpolation": "bilinear between samples",
-    "sha256": "646a67489eb43e66683541cb2db9024173b7ba6043282cc6efaf5bf63e0b6b05"
+    "surface": "dtm-approx",
+    "sha256": "1a8f9fc320f7d27408e75ef28c21767ea22f25fbd3e368782fbb4036683512d9",
+    "ground_model": {
+      "method": "DEM filled in under building footprints from the surrounding samples, lowered by half the canopy height under trees, never above the DEM (tools/buildings.py)",
+      "removed_median_m": 4.2721405029296875,
+      "removed_p90_m": 8.0
+    }
   },
   "color": {
     "file": "color.png",
@@ -100,7 +106,10 @@
   "attribution": [
     "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
     "Contains modified Copernicus Sentinel data 2025",
-    "© OpenStreetMap contributors, Overture Maps Foundation (ODbL 1.0, https://www.openstreetmap.org/copyright)"
+    "© OpenStreetMap contributors, Overture Maps Foundation (ODbL 1.0, https://www.openstreetmap.org/copyright)",
+    "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium (CC BY 4.0)",
+    "Canopy height: Lang, N., Jetz, W., Schindler, K., Wegner, J. D. (2023), A high-resolution canopy height model of the Earth, Nature Ecology & Evolution; ETH Global Canopy Height 2020, doi:10.3929/ethz-b-000609802 (CC BY 4.0)",
+    "Building heights: Pesaresi, M., Politis, P. (2023), GHS-BUILT-H R2023A, European Commission, Joint Research Centre, doi:10.2905/85005901-3A49-48DD-9D19-6261354F56FE (CC BY 4.0)"
   ],
   "disclaimer": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
   "water": {
@@ -124,5 +133,81 @@
     "license": "ODbL-1.0 (derived from OpenStreetMap)",
     "water_share": 0.5569057406359413,
     "sha256": "2cfcd036a6148e1a5386992a55f7f849ce22194d85e9e80075be66cab468bf0a"
+  },
+  "landcover": {
+    "file": "landcover.png",
+    "encoding": "PNG L8, ESA WorldCover 2021 class value (10 tree cover, 20 shrubland, 30 grassland, 40 cropland, 50 built-up, 60 bare, 70 snow and ice, 80 water, 90 wetland, 95 mangroves, 100 moss and lichen; 0 no data), nearest neighbour",
+    "samples": 201,
+    "spacing_m": 15.0,
+    "source": {
+      "product": "ESA WorldCover 10 m 2021 v200",
+      "access": "s3://esa-worldcover/v200/2021/map",
+      "tiles": [
+        "ESA_WorldCover_10m_2021_v200_N39E027_Map.tif"
+      ],
+      "citation": "Zanaga, D. et al. (2022) ESA WorldCover 10 m 2021 v200, doi:10.5281/zenodo.7254221"
+    },
+    "license": "CC-BY-4.0",
+    "shares": {
+      "tree cover": 0.0957,
+      "grassland": 0.0011,
+      "built-up": 0.3422,
+      "bare / sparse vegetation": 0.0023,
+      "permanent water bodies": 0.5588
+    },
+    "sha256": "2563d26e70829faae1b62c9f8a0876076120bd225f5c57d412c0f3dc1da23333"
+  },
+  "canopy": {
+    "file": "canopy.png",
+    "encoding": "PNG L8, canopy top height above ground in quarter metres (value / 4 = metres, 0..63.75), nearest neighbour; no data = 0",
+    "samples": 201,
+    "spacing_m": 15.0,
+    "source": {
+      "product": "ETH Global Canopy Height 10 m 2020 (Lang et al. 2023)",
+      "access": "libdrive.ethz.ch 3deg_cogs",
+      "tiles": [
+        "ETH_GlobalCanopyHeight_10m_2020_N39E027_Map.tif"
+      ]
+    },
+    "license": "CC-BY-4.0",
+    "sha256": "0b65d8df5f0e94c85372df1ac7c2b3b34f4770fe578e94fcc07b8592d625770e"
+  },
+  "buildings": {
+    "file": "buildings.bin",
+    "encoding": "godot-geo buildings v1 (see tools/buildings.py): zlib tiles of footprints with base, heights, roof shape, colours and roof triangles; positions in the package frame",
+    "tile_m": 500.0,
+    "tiles": {
+      "x": 6,
+      "z": 6,
+      "non_empty": 22
+    },
+    "count": 3626,
+    "height_sources": {
+      "tag": 0.0074,
+      "floors": 0.0177,
+      "ghsl": 0.9749,
+      "default": 0.0
+    },
+    "dropped": {
+      "military_dropped": 4,
+      "underground_dropped": 11,
+      "outside": 2761
+    },
+    "source": {
+      "product": "Overture Maps buildings (OpenStreetMap; Microsoft ML footprints where OSM has none)",
+      "release": "2026-10-21.0",
+      "access": "s3://overturemaps-us-west-2/release/2026-10-21.0/theme=buildings",
+      "height_hint": "GHS-BUILT-H R2023A ANBH 2018 (100 m)"
+    },
+    "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)",
+    "sha256": "57f6c5a4ea7fd2547d31258167604a6a173b028e5b8c16ca85b818c340784c20"
+  },
+  "footprints": {
+    "file": "footprints.png",
+    "encoding": "PNG L8, 255 where a building footprint touches the height sample's cell, else 0",
+    "samples": 201,
+    "spacing_m": 15.0,
+    "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)",
+    "sha256": "786c4b7ef43f41d645a145d02e6a35eff7ba790b7fe0782da4b4b8be8c63e9fe"
   }
 }

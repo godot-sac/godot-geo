@@ -256,10 +256,10 @@ func geodetic_height(lat: float, lon: float) -> float:
 ## First point where the ray from global `from` along `direction` meets the terrain surface (the drawn and
 ## collision surface, no physics involved). Returns {hit: bool, position: Vector3, distance: float,
 ## normal: Vector3}; hit is false if the ray leaves the package or max_distance first.
-func raycast(from: Vector3, direction: Vector3, max_distance := 1.0e7) -> Dictionary:
+func raycast(from: Vector3, direction: Vector3, max_distance := 1.0e7, mask := GeoVisibility.ALL) -> Dictionary:
 	if package == null:
 		return {"hit": false, "position": from, "distance": INF, "normal": Vector3.UP}
-	var r := GeoVisibility.raycast(package, to_package_local(from), direction, max_distance)
+	var r := GeoVisibility.raycast(package, to_package_local(from), direction, max_distance, mask)
 	r.position = from_package_local(r.position)
 	return r
 
@@ -272,11 +272,14 @@ func raycast(from: Vector3, direction: Vector3, max_distance := 1.0e7) -> Dictio
 ##   part is not tested).
 ## `refraction` is the coefficient k of a ray bending towards the ground (0 = straight; 0.13 optical, 0.25 radio).
 ## Earth curvature is always included (it is part of the heights).
-func line_of_sight(a: Vector3, b: Vector3, refraction := 0.0) -> Dictionary:
+## `mask` (GeoVisibility.TERRAIN | BUILDINGS | TREES) picks what blocks; by default everything the package has.
+## `obstacle` says what blocked ("terrain", "building", "tree"; "" when visible) and `building_id` which building.
+## `clearance` is measured against the terrain surface only.
+func line_of_sight(a: Vector3, b: Vector3, refraction := 0.0, mask := GeoVisibility.ALL) -> Dictionary:
 	if package == null:
 		return {"visible": true, "point": b, "distance": a.distance_to(b), "clearance": INF,
-				"clearance_point": a, "partial": true}
-	var r := GeoVisibility.line_of_sight(package, to_package_local(a), to_package_local(b), refraction)
+				"clearance_point": a, "partial": true, "obstacle": ""}
+	var r := GeoVisibility.line_of_sight(package, to_package_local(a), to_package_local(b), refraction, 0.001, mask)
 	r.point = from_package_local(r.point)
 	r.clearance_point = from_package_local(r.clearance_point)
 	return r
@@ -289,10 +292,11 @@ func line_of_sight(a: Vector3, b: Vector3, refraction := 0.0) -> Dictionary:
 ## worker thread call GeoVisibility.viewshed(package, to_package_local(observer), ...) instead: node transforms may
 ## only be read on the main thread.
 func viewshed(observer: Vector3, radius: float, target_height := 0.0, resolution := 256,
-		refraction := 0.0) -> Image:
+		refraction := 0.0, mask := GeoVisibility.ALL) -> Image:
 	if package == null:
 		return null
-	return GeoVisibility.viewshed(package, to_package_local(observer), radius, target_height, resolution, refraction)
+	return GeoVisibility.viewshed(package, to_package_local(observer), radius, target_height, resolution, refraction,
+			mask)
 
 
 ## Global x / z rectangle (position = north-west corner, x east, y = z south) covered by viewshed().

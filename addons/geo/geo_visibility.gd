@@ -13,6 +13,11 @@ class_name GeoVisibility
 extends RefCounted
 
 const EARTH_RADIUS := 6371000.0
+## What blocks a line of sight (bit mask): the terrain surface, buildings, tree crowns.
+const TERRAIN := 1
+const BUILDINGS := 2
+const TREES := 4
+const ALL := 7
 
 
 ## Surface height at local x, z (clamped to the grid); identical to the CDLOD backend's surface_height.
@@ -154,22 +159,63 @@ static func trace(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, refraction := 
 
 ## Line of sight between local points a and b. See GeoTerrain.line_of_sight.
 static func line_of_sight(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, refraction := 0.0,
-		tolerance := 0.001) -> Dictionary:
+		tolerance := 0.001, mask := ALL) -> Dictionary:
 	var tr := trace(pkg, a, b, refraction, false, tolerance)
-	var blocked: bool = tr.blocked
-	var hit := a.lerp(b, tr.t_hit) if blocked else b
-	return {
+	var blocked: bool = tr.blocked and (mask & TERRAIN) != 0
+	var t_hit: float = tr.t_hit if blocked else 1.0
+	var obstacle := "terrain" if blocked else ""
+	var out := {}
+	var ob := obstacle_hit(pkg, a, b, t_hit, mask)
+	if ob.hit:
+		blocked = true
+		t_hit = ob.t
+		obstacle = ob.obstacle
+		if ob.has("id"):
+			out.building_id = ob.id
+	var hit := a.lerp(b, t_hit) if blocked else b
+	out.merge({
 		"visible": not blocked,
 		"point": hit,
 		"distance": a.distance_to(hit),
 		"clearance": tr.min_clearance if tr.tested else INF,
 		"clearance_point": a.lerp(b, tr.t_min) if tr.tested else a,
 		"partial": tr.partial,
-	}
+		"obstacle": obstacle,
+	})
+	return out
+
+
+## First building or tree crown on the segment a -> b before `t_max` (0..1): {hit, t, obstacle ("building" /
+## "tree"), id (buildings)}. Tree crowns are solid from the ground to the canopy height of their 10 m sample (see
+## GeoTerrainPackage.tree_height_at), sampled every half land cover sample along the segment.
+static func obstacle_hit(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, t_max := 1.0, mask := ALL) -> Dictionary:
+	var best := {"hit": false, "t": t_max}
+	if mask & BUILDINGS:
+		var bd := pkg.buildings_data()
+		if bd:
+			var h := bd.segment_hit(a, b, t_max)
+			if h.hit and h.t < best.t:
+				best = {"hit": true, "t": h.t, "obstacle": "building", "id": h.id}
+	if mask & TREES and pkg.has_layer("canopy"):
+		var step: float = pkg.layer_spacing.canopy * 0.5
+		var length := Vector2(b.x - a.x, b.z - a.z).length()
+		var n := maxi(1, ceili(length * best.t / step))
+		for s in n + 1:
+			var t: float = best.t * s / n
+			var p := a.lerp(b, t)
+			if not pkg.contains(p.x, p.z):
+				continue
+			var crown := pkg.tree_height_at(p.x, p.z)
+			if crown > 0.0 and p.y < surface_height(pkg, p.x, p.z) + crown:
+				if t < best.t or not best.hit:
+					best = {"hit": true, "t": t, "obstacle": "tree"}
+				break
+	return best
 
 
 ## First intersection of the ray from local `from` along `direction`. See GeoTerrain.raycast.
-static func raycast(pkg: GeoTerrainPackage, from: Vector3, direction: Vector3, max_distance := 1.0e7) -> Dictionary:
+static func raycast(pkg: GeoTerrainPackage, from: Vector3, direction: Vector3, max_distance := 1.0e7,
+		mask := ALL) -> Dictionary:
 	var dir := direction.normalized()
 	# Shorten the ray to the package's square so the walk does not count lines far outside it.
 	var half := pkg.size_m * 0.5
@@ -181,11 +227,20 @@ static func raycast(pkg: GeoTerrainPackage, from: Vector3, direction: Vector3, m
 			reach = minf(reach, maxf(limit, 0.0) + 1.0)
 	var to := from + dir * reach
 	var tr := trace(pkg, from, to, 0.0, true, 0.0)
-	if not tr.blocked:
+	var t_hit: float = tr.t_hit if tr.blocked and (mask & TERRAIN) else 1.0
+	var ob := obstacle_hit(pkg, from, to, t_hit, mask)
+	if ob.hit:
+		var q := from.lerp(to, ob.t)
+		var r := {"hit": true, "position": q, "distance": from.distance_to(q), "normal": -dir, "obstacle": ob.obstacle}
+		if ob.has("id"):
+			r.building_id = ob.id
+		return r
+	if not tr.blocked or not (mask & TERRAIN):
 		return {"hit": false, "position": to, "distance": INF, "normal": Vector3.UP}
 	var p := from.lerp(to, tr.t_hit)
 	p.y = surface_height(pkg, p.x, p.z)
-	return {"hit": true, "position": p, "distance": from.distance_to(p), "normal": surface_normal(pkg, p.x, p.z)}
+	return {"hit": true, "position": p, "distance": from.distance_to(p), "normal": surface_normal(pkg, p.x, p.z),
+			"obstacle": "terrain"}
 
 
 ## Viewshed around local `observer` (the eye position). Returns an Image (FORMAT_LA8) of resolution x resolution
@@ -195,9 +250,11 @@ static func raycast(pkg: GeoTerrainPackage, from: Vector3, direction: Vector3, m
 ## one pixel and one height sample along its major axis and keeping the steepest terrain slope seen so far; a pixel
 ## is visible if any ray sees a point of it. Cost: about 2 * resolution^2 * max(1, pixel size / sample spacing).
 static func viewshed(pkg: GeoTerrainPackage, observer: Vector3, radius: float, target_height := 0.0,
-		resolution := 256, refraction := 0.0) -> Image:
+		resolution := 256, refraction := 0.0, mask := ALL) -> Image:
 	var res := maxi(resolution, 2)
 	var cell := 2.0 * radius / res
+	var tops := obstacle_tops(pkg, Rect2(observer.x - radius, observer.z - radius, 2.0 * radius, 2.0 * radius), res,
+			mask)
 	var x0 := observer.x - radius
 	var z0 := observer.z - radius
 	var half := pkg.size_m * 0.5
@@ -261,6 +318,8 @@ static func viewshed(pkg: GeoTerrainPackage, observer: Vector3, radius: float, t
 			var fr := (z - z0) / cell
 			var col := floori(fc)
 			var row := floori(fr)
+			if not tops.is_empty() and col >= 0 and col < res and row >= 0 and row < res:
+				h += tops[row * res + col]
 			if col >= 0 and col < res and row >= 0 and row < res:
 				var ec := fc - col - 0.5
 				var er := fr - row - 0.5
@@ -271,6 +330,41 @@ static func viewshed(pkg: GeoTerrainPackage, observer: Vector3, radius: float, t
 					bytes[k * 2] = 255 if (h + target_height) / d >= max_slope else 0
 			max_slope = maxf(max_slope, h / d)
 	return Image.create_from_data(res, res, false, Image.FORMAT_LA8, bytes)
+
+
+## Height of buildings and tree crowns above the terrain at each pixel centre of a res x res grid over `rect`
+## (package frame); empty when the mask or the package has neither. A pixel takes the tallest building whose
+## footprint contains its centre (blocks' tops as in line_of_sight), else the tree crown there.
+static func obstacle_tops(pkg: GeoTerrainPackage, rect: Rect2, res: int, mask := ALL) -> PackedFloat32Array:
+	var bd := pkg.buildings_data() if mask & BUILDINGS else null
+	var trees := (mask & TREES) != 0 and pkg.has_layer("canopy")
+	if bd == null and not trees:
+		return PackedFloat32Array()
+	var cell := rect.size.x / res
+	var tops := PackedFloat32Array()
+	tops.resize(res * res)
+	tops.fill(0.0)
+	if trees:
+		for row in res:
+			for col in res:
+				var x := rect.position.x + (col + 0.5) * cell
+				var z := rect.position.y + (row + 0.5) * cell
+				if pkg.contains(x, z):
+					tops[row * res + col] = pkg.tree_height_at(x, z)
+	if bd:
+		for bld: Dictionary in bd.buildings_in(rect):
+			var r: Rect2 = bld.aabb
+			var c0 := maxi(floori((r.position.x - rect.position.x) / cell - 0.5), 0)
+			var c1 := mini(ceili((r.end.x - rect.position.x) / cell - 0.5), res - 1)
+			var r0 := maxi(floori((r.position.y - rect.position.y) / cell - 0.5), 0)
+			var r1 := mini(ceili((r.end.y - rect.position.y) / cell - 0.5), res - 1)
+			for row in range(r0, r1 + 1):
+				for col in range(c0, c1 + 1):
+					var p := Vector2(rect.position.x + (col + 0.5) * cell, rect.position.y + (row + 0.5) * cell)
+					if r.has_point(p) and GeoBuildingData._inside(bld.rings, p):
+						var top := GeoBuildingData.top_of(bld) - surface_height(pkg, p.x, p.y)
+						tops[row * res + col] = maxf(tops[row * res + col], top)
+	return tops
 
 
 ## Colours a viewshed image for GeoTerrain.set_overlay: visible and hidden pixels get the given colours (with their

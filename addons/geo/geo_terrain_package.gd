@@ -35,6 +35,7 @@ var layer_spacing := {}
 var water: Image
 var water_samples := 0
 var water_spacing := 0.0
+var _buildings: GeoBuildingData
 
 
 ## Loads the package directory `dir` (res://, user:// or absolute). With `verify` the SHA-256 of each file is checked.
@@ -109,6 +110,30 @@ func _load(dir: String, verify: bool) -> String:
 		water_samples = water.get_width()
 		water_spacing = layer_spacing.water
 	return ""
+
+
+## The package's buildings (buildings.bin), opened on first use and shared by the building layer and the
+## visibility queries; null if the package has none.
+func buildings_data() -> GeoBuildingData:
+	if _buildings == null and meta.has("buildings"):
+		var d := GeoBuildingData.open(_global(path.path_join(meta.buildings.file)), size_m)
+		if d.ok():
+			_buildings = d
+		else:
+			push_error("GeoTerrainPackage: " + d.error)
+	return _buildings
+
+
+## Tree crown top above the surface at local x, z (metres; 0 where the tree layer puts no trees): the canopy height
+## where land cover is tree cover or the canopy is at least 3 m, outside building footprints.
+func tree_height_at(x: float, z: float) -> float:
+	if not layers.has("canopy"):
+		return 0.0
+	var h := layer_value("canopy", x, z) * 0.25
+	var cls := layer_value("landcover", x, z)
+	if (cls != 10 and h < 3.0) or cls == 80 or layer_value("footprints", x, z) > 0:
+		return 0.0
+	return h if h >= 3.0 else 0.0
 
 
 func has_water() -> bool:

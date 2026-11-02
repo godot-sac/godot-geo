@@ -42,11 +42,8 @@ func _rebuild() -> void:
 	data = null
 	if not has_data():
 		return
-	data = GeoBuildingData.open(GeoTerrainPackage._global(package.path.path_join(package.meta.buildings.file)),
-			package.size_m)
-	if not data.ok():
-		push_error("GeoBuildingLayer: " + data.error)
-		data = null
+	data = package.buildings_data()
+	if data == null:
 		return
 	_wall_mat = ShaderMaterial.new()
 	_wall_mat.shader = WALL_SHADER

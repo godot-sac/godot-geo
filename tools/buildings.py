@@ -41,6 +41,7 @@ from rasterio.transform import Affine
 import layers
 
 FLOOR_M = 3.0
+MAX_LOWERING = 8.0  # m, see ground_model
 QUANT = 0.05
 TILE_M = 500.0
 GHSL_URL = ("/vsizip//vsicurl/https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_H_GLOBE_R2023A/"
@@ -94,7 +95,9 @@ def fill_holes(values: np.ndarray, known: np.ndarray) -> np.ndarray:
     levels = [(values.astype(np.float64), known.astype(np.float64))]
     while min(levels[-1][0].shape) > 2 and levels[-1][1].min() == 0:
         levels.append(_down(*levels[-1]))
-    filled = levels[-1][0]
+    top, w_top = levels[-1]
+    mean = float((values[known]).mean()) if known.any() else 0.0
+    filled = np.where(w_top > 0, top, mean)  # cells still empty at the coarsest level take the overall mean
     for a, w in reversed(levels[:-1]):
         up = np.repeat(np.repeat(filled, 2, axis=0), 2, axis=1)[:a.shape[0], :a.shape[1]]
         filled = np.where(w > 0, a, up)
@@ -108,15 +111,26 @@ def fill_holes(values: np.ndarray, known: np.ndarray) -> np.ndarray:
 
 def _dilate(mask: np.ndarray) -> np.ndarray:
     p = np.pad(mask, 1)
-    return p[1:-1, 1:-1] | p[:-2, 1:-1] | p[2:, 1:-1] | p[1:-1, :-2] | p[1:-1, 2:]
+    rows = p[:-2] | p[1:-1] | p[2:]
+    return rows[:, :-2] | rows[:, 1:-1] | rows[:, 2:]  # 3 x 3 square
 
 
-def ground_model(dsm: np.ndarray, footprints: np.ndarray, canopy_m: np.ndarray | None) -> np.ndarray:
-    lowered = dsm.astype(np.float64)
-    if canopy_m is not None:
-        lowered = lowered - 0.5 * np.where(canopy_m >= 3.0, canopy_m, 0.0)
+def ground_model(dsm: np.ndarray, footprints: np.ndarray, canopy_m: np.ndarray | None,
+                 water: np.ndarray | None = None) -> np.ndarray:
+    """Approximate bare earth. Water samples neither feed the fill (on a built-up shore they would drag the land
+    down to sea level) nor change."""
+    crowns = 0.5 * np.where(canopy_m >= 3.0, canopy_m, 0.0) if canopy_m is not None else np.zeros_like(dsm)
+    lowered = dsm.astype(np.float64) - crowns
     mask = _dilate(footprints)
-    ground = fill_holes(lowered, ~mask)
+    if water is not None:
+        mask = mask & ~water
+        ground = fill_holes(lowered, ~mask & ~water)
+        ground = np.where(water, dsm, ground)
+    else:
+        ground = fill_holes(lowered, ~mask)
+    # The 30 m DEM smears a roof over its surroundings, so the building signal in it is a few metres; capping the
+    # lowering keeps hills that are entirely built over (the fill would otherwise flatten them towards their foot).
+    ground = np.maximum(ground, dsm - np.maximum(MAX_LOWERING, crowns))
     return np.minimum(ground, dsm).astype(np.float32)
 
 
@@ -242,7 +256,8 @@ def _rect_like(poly) -> tuple[bool, float, float]:
     return fill > 0.85 and len(poly.exterior.coords) <= 9, min(a, b), max(a, b)
 
 
-def build_buildings(grid, dsm: np.ndarray, canopy_layer, bounds, release, cache, network, log, sha256_file):
+def build_buildings(grid, dsm: np.ndarray, canopy_layer, bounds, release, cache, network, log, sha256_file,
+                    water_layer=None):
     """Returns (ground heights for height.exr, [Layer buildings.bin, Layer footprints.png], stats)."""
     feats, stats = load_features(grid, bounds, release, cache, network, log)
     log(f"  {len(feats)} buildings / parts in the area; dropped: {stats}")
@@ -264,7 +279,8 @@ def build_buildings(grid, dsm: np.ndarray, canopy_layer, bounds, release, cache,
     canopy_m = None
     if canopy_layer is not None:
         canopy_m = _resample_nearest(canopy_layer.image, n).astype(np.float32) / 4.0
-    ground = ground_model(dsm, labels > 0, canopy_m)
+    water = _resample_nearest(water_layer.image, n) >= 128 if water_layer is not None else None
+    ground = ground_model(dsm, labels > 0, canopy_m, water)
     residual = np.clip(dsm - ground, 0.0, None)
     removed = residual[labels > 0]
     log(f"  ground model: DEM lowered under footprints by {np.median(removed):.1f} m median, "

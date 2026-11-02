@@ -1009,8 +1009,10 @@ def build(args: argparse.Namespace) -> dict:
         if "buildings" in args.layers:
             log("buildings:")
             canopy = next((x for x in extra if x.key == "canopy"), None)
+            water = next((x for x in extra if x.key == "water"), None)
             height, blayer, ground_stats = geo_buildings.build_buildings(
-                grid, height, canopy, grid_bounds(grid), args.overture_release, CACHE, network, log, sha256_file)
+                grid, height, canopy, grid_bounds(grid), args.overture_release, CACHE, network, log, sha256_file,
+                water)
             extra += blayer
             surface, ground_model = "dtm-approx", {
                 "method": "DEM filled in under building footprints from the surrounding samples, lowered by half "

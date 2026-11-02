@@ -1,6 +1,6 @@
 ## The buildings of a package (buildings.bin, written by tools/buildings.py): tiles decoded on first use and kept,
 ## plus a 25 m grid per tile for ray queries. Positions are in the package frame (x east, z south, y up).
-## Safe to read from worker threads once a tile is decoded; `tile()` itself must not run on two threads at once.
+## Thread-safe: tiles are decoded under a lock, and a decoded tile is never changed.
 class_name GeoBuildingData
 extends RefCounted
 
@@ -16,8 +16,8 @@ var count := 0
 var half := 0.0
 var _file: FileAccess
 var _index := PackedInt64Array()  # per tile: offset, zlib size, raw size, count
-var _tiles := {}  # tile index -> Array[Dictionary]
-var _grids := {}  # tile index -> {Vector2i cell: PackedInt32Array of building indices}
+var _tiles := {}  # tile index -> [Array of buildings, {Vector2i cell: PackedInt32Array of building indices}]
+var _lock := Mutex.new()
 
 
 static func open(file: String, size_m: float) -> GeoBuildingData:
@@ -71,18 +71,25 @@ func tile_of(x: float, z: float) -> Vector2i:
 ## base, min_height, height, roof_height, rings (Array of PackedVector2Array, package-frame x / z; ring 0 is the
 ## outline, positive signed area), tris (PackedInt32Array into the rings' vertices in order), aabb (Rect2).
 func tile(i: int, j: int) -> Array:
+	return _entry(i, j)[0]
+
+
+## [buildings, grid] of a tile, decoded on first use.
+func _entry(i: int, j: int) -> Array:
 	var key := j * tiles_x + i
-	if _tiles.has(key):
-		return _tiles[key]
-	var out := []
-	if tile_count(i, j) > 0:
-		var o := key * 4
-		_file.seek(_index[o])
-		var raw := _file.get_buffer(_index[o + 1]).decompress(_index[o + 2], FileAccess.COMPRESSION_DEFLATE)
-		out = _decode(raw, tile_center(i, j))
-	_tiles[key] = out
-	_index_tile(key, out)
-	return out
+	_lock.lock()
+	var e: Array = _tiles.get(key, [])
+	if e.is_empty():
+		var out := []
+		if tile_count(i, j) > 0:
+			var o := key * 4
+			_file.seek(_index[o])
+			var raw := _file.get_buffer(_index[o + 1]).decompress(_index[o + 2], FileAccess.COMPRESSION_DEFLATE)
+			out = _decode(raw, tile_center(i, j))
+		e = [out, _grid_of(out)]
+		_tiles[key] = e
+	_lock.unlock()
+	return e
 
 
 func _decode(b: PackedByteArray, center: Vector2) -> Array:
@@ -132,7 +139,7 @@ func _decode(b: PackedByteArray, center: Vector2) -> Array:
 	return out
 
 
-func _index_tile(key: int, list: Array) -> void:
+func _grid_of(list: Array) -> Dictionary:
 	var grid := {}
 	for k in list.size():
 		var r: Rect2 = list[k].aabb
@@ -142,7 +149,7 @@ func _index_tile(key: int, list: Array) -> void:
 				if not grid.has(c):
 					grid[c] = PackedInt32Array()
 				grid[c].append(k)
-	_grids[key] = grid
+	return grid
 
 
 ## Height of the top of the building's block above which a ray passes freely: the walls plus half the roof (the
@@ -177,8 +184,9 @@ func segment_hit(a: Vector3, b: Vector3, t_max := 1.0) -> Dictionary:
 				if tile_count(tii, tj) == 0:
 					continue
 				var key := tj * tiles_x + tii
-				var list := tile(tii, tj)
-				var grid: Dictionary = _grids[key]
+				var e := _entry(tii, tj)
+				var list: Array = e[0]
+				var grid: Dictionary = e[1]
 				for dz in range(-1, 2):
 					for dx in range(-1, 2):
 						for k: int in grid.get(cell + Vector2i(dx, dz), PackedInt32Array()):
@@ -255,6 +263,21 @@ static func _inside(rings: Array, p: Vector2) -> bool:
 	return true
 
 
+## Buildings whose bounding box meets `rect` (package-frame x / z).
+func buildings_in(rect: Rect2) -> Array:
+	var out := []
+	var a := tile_of(rect.position.x, rect.position.y)
+	var b := tile_of(rect.end.x, rect.end.y)
+	for j in range(a.y - 1, b.y + 2):
+		for i in range(a.x - 1, b.x + 2):
+			if tile_count(i, j) == 0:
+				continue
+			for bld: Dictionary in tile(i, j):
+				if rect.intersects(bld.aabb):
+					out.append(bld)
+	return out
+
+
 ## The building whose footprint contains package-frame x, z (its Dictionary), or an empty one.
 func building_at(x: float, z: float) -> Dictionary:
 	var ti := tile_of(x, z)
@@ -264,9 +287,9 @@ func building_at(x: float, z: float) -> Dictionary:
 			var j := ti.y + dj
 			if tile_count(i, j) == 0:
 				continue
-			var list := tile(i, j)
-			var ids: PackedInt32Array = _grids[j * tiles_x + i].get(Vector2i(floori(x / CELL), floori(z / CELL)),
-					PackedInt32Array())
+			var e := _entry(i, j)
+			var list: Array = e[0]
+			var ids: PackedInt32Array = e[1].get(Vector2i(floori(x / CELL), floori(z / CELL)), PackedInt32Array())
 			for k in ids:
 				var bld: Dictionary = list[k]
 				if bld.aabb.has_point(Vector2(x, z)) and _inside(bld.rings, Vector2(x, z)):
