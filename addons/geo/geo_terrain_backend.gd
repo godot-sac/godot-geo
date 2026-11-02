@@ -31,6 +31,11 @@ func set_ground_detail(_strength: float) -> void:
 	pass
 
 
+## Road texture painted around the camera (GeoRoadLayer): ring 0 near, 1 far; optional for a backend.
+func set_road_ring(_k: int, _texture: Texture2D, _rect: Rect2) -> void:
+	pass
+
+
 ## Draw the package's water layer as water (if it has one); optional for a backend.
 func set_water(_enabled: bool) -> void:
 	pass

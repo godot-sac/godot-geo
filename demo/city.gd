@@ -1,7 +1,8 @@
-## City view: a GeoTerrain package with its layers (water so far), sun, sky and haze, a free camera and named camera
+## City view: a GeoTerrain package with its layers (water, ground detail, trees, buildings, roads), sun, sky, haze, a free camera and named camera
 ## bookmarks (demo/places.json) for comparing the picture with places you know.
 ##   <godot> --path . res://demo/city.tscn [-- --package <dir>] [--place <id>]
 ##   <godot> --path . res://demo/city.tscn -- --tour --out <dir>   (one PNG per bookmark + stats.json, then quits)
+##   <godot> --path . res://demo/city.tscn -- --check [--report x.json] | --bench x.json   (see city_check.gd)
 ## Package: --package, else res://terrain/uskudar_10km, res://terrain/uskudar, then the Üsküdar test package.
 ## Controls: right mouse + WASD / Q E, Shift = fast, wheel = speed; Tab = bookmark list, 1-9 / 0 = bookmarks,
 ## PgUp / PgDn = previous / next, G = drop to 2 m above ground, F = walk, F3 = info, F12 = screenshot (user://).
@@ -9,6 +10,7 @@ extends Node3D
 
 const PACKAGES := ["res://terrain/uskudar_10km", "res://terrain/uskudar", "res://tests/data/uskudar_small"]
 const PLACES_FILE := "res://demo/places.json"
+const CityCheck := preload("res://demo/city_check.gd")
 const SUN_ELEVATION := 35.0
 const SUN_AZIMUTH := 220.0  # from true north, clockwise: early afternoon, sun in the south-west
 
@@ -17,6 +19,7 @@ var places: Array[Dictionary] = []
 var current := -1
 var walking := false
 var _speed := 150.0
+var _checker: RefCounted
 
 @onready var terrain: GeoTerrain = $GeoTerrain
 @onready var camera: Camera3D = $Camera
@@ -45,6 +48,14 @@ func _ready() -> void:
 	_load_places()
 	place_list.item_selected.connect(func(i: int) -> void: _go_to(i))
 	var out := _arg(args, "--out", "")
+	if "--check" in args or "--bench" in args:
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+		_checker = CityCheck.new(self)  # kept: a RefCounted freed after _ready would never resume its awaits
+		if "--check" in args:
+			_checker.run_check.call_deferred(_arg(args, "--report", ""))
+		else:
+			_checker.run_bench.call_deferred(_arg(args, "--bench", "user://city_bench.json"))
+		return
 	if "--tour" in args:
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		_tour.call_deferred(out if not out.is_empty() else "user://city_tour")
@@ -142,6 +153,9 @@ func _layer_counts() -> Dictionary:
 			out["trees"] = l.tree_count
 		elif l is GeoBuildingLayer:
 			out["buildings"] = l.buildings_drawn
+		elif l is GeoRoadLayer:
+			out["roads_near"] = l.painted()
+			out["bridges"] = l.bridges
 	return out
 
 

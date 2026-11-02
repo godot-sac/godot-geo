@@ -33,6 +33,16 @@ uniform sampler2DArray detail_normal : hint_normal, filter_linear_mipmap_anisotr
 uniform float urban_ground = 0.0;
 uniform float urban_distance = 4000.0;
 uniform vec3 urban_color : source_color = vec3(0.36, 0.35, 0.34);
+// Road rings painted by GeoRoadLayer around the camera: r = asphalt, g = pavement, b = rail coverage; rect = local
+// x0, z0, width, depth. Ring 0 is the near (sharp) one.
+uniform bool road_enabled = false;
+uniform sampler2D road_ring0 : filter_linear, repeat_disable;
+uniform sampler2D road_ring1 : filter_linear, repeat_disable;
+uniform vec4 road_rect0 = vec4(0.0, 0.0, 1.0, 1.0);
+uniform vec4 road_rect1 = vec4(0.0, 0.0, 1.0, 1.0);
+uniform vec3 asphalt_color : source_color = vec3(0.23, 0.23, 0.24);
+uniform vec3 pavement_color : source_color = vec3(0.55, 0.53, 0.5);
+uniform vec3 rail_color : source_color = vec3(0.33, 0.3, 0.27);
 // Water layer: coverage mask (1 = water) on its own grid. The surface is the terrain itself (the DEM is at water
 // level there); only the shading changes: wave normals near the camera, low roughness, a darker colour.
 uniform bool water_enabled = false;
@@ -212,6 +222,25 @@ void fragment() {
 		float lum = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
 		vec3 street = urban_color * (0.75 + 0.5 * clamp(lum / 0.25, 0.0, 1.5));
 		albedo = mix(albedo, street, wb * fade * urban_ground);
+	}
+	if (road_enabled) {
+		vec2 loc = p * spacing - vec2(half_size);
+		vec2 u0 = (loc - road_rect0.xy) / road_rect0.zw;
+		vec2 u1 = (loc - road_rect1.xy) / road_rect1.zw;
+		vec4 rc = vec4(0.0);
+		// Blend from the near ring into the far one over the outer eighth of the near ring.
+		vec2 e0 = min(u0, 1.0 - u0);
+		float w0 = clamp(min(e0.x, e0.y) * 8.0, 0.0, 1.0);
+		if (w0 > 0.0) {
+			rc = texture(road_ring0, u0) * w0;
+		}
+		if (w0 < 1.0 && all(greaterThanEqual(u1, vec2(0.0))) && all(lessThan(u1, vec2(1.0)))) {
+			rc += texture(road_ring1, u1) * (1.0 - w0);
+		}
+		float grain = 0.92 + 0.16 * value_noise(p * spacing * 1.3);
+		albedo = mix(albedo, pavement_color * grain, clamp(rc.g, 0.0, 1.0) * 0.85);
+		albedo = mix(albedo, asphalt_color * grain, clamp(rc.r, 0.0, 1.0));
+		albedo = mix(albedo, rail_color * grain, clamp(rc.b, 0.0, 1.0));
 	}
 	float roughness = 0.95;
 	float specular = 0.2;

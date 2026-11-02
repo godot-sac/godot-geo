@@ -15,7 +15,7 @@ enum Backend { CDLOD }
 
 ## Layer types `auto_layers` may add, in drawing order.
 const LAYER_TYPES: Array[Script] = [preload("res://addons/geo/layers/geo_building_layer.gd"),
-		preload("res://addons/geo/layers/geo_tree_layer.gd")]
+		preload("res://addons/geo/layers/geo_road_layer.gd"), preload("res://addons/geo/layers/geo_tree_layer.gd")]
 
 ## Package directory (contains terrain.json).
 @export_dir var package_path := "":
@@ -63,6 +63,8 @@ var package: GeoTerrainPackage
 var origin_offset := 0.0
 ## Empty when the scene origin matches the package origin (or there is none); otherwise why not.
 var origin_warning := ""
+## Milliseconds each layer's update took in the last frame (layer name -> ms), for profiling.
+var layer_ms := {}
 
 var _backend: GeoTerrainBackend
 var _body: StaticBody3D
@@ -175,7 +177,9 @@ func _update(force: bool) -> void:
 		_backend.update_view(_backend.to_local(cam.global_position))
 		var local := to_package_local(cam.global_position)
 		for l in layers():
+			var t0 := Time.get_ticks_usec()
 			l.update_view(local)
+			layer_ms[l.name] = (Time.get_ticks_usec() - t0) / 1000.0
 	if _body:
 		var target := get_node_or_null(collision_target) as Node3D if not collision_target.is_empty() else cam
 		if target:
@@ -200,6 +204,12 @@ func height_at(x: float, z: float) -> float:
 	if not package.contains(p.x, p.z):
 		return NAN
 	return global_position.y + origin_offset + _backend.surface_height(p.x, p.z)
+
+
+## Road texture painted around the camera by a GeoRoadLayer (ring 0 near, 1 far; rect in the package frame).
+func set_road_ring(k: int, texture: Texture2D, rect: Rect2) -> void:
+	if _backend:
+		_backend.set_road_ring(k, texture, rect)
 
 
 ## Surface height in the package frame (x, z, result relative to the package origin); NAN outside the package.

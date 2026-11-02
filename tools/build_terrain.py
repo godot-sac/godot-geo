@@ -44,6 +44,7 @@ from rasterio.windows import Window, from_bounds
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I leaves the script directory off sys.path
 import dted  # noqa: E402
 import buildings as geo_buildings  # noqa: E402
+import roads as geo_roads  # noqa: E402
 import layers as geo_layers  # noqa: E402
 
 VERSION = "0.1.0"
@@ -1003,7 +1004,7 @@ def build(args: argparse.Namespace) -> dict:
         layer_grids = {"water": Grid(args.lat, args.lon, args.origin_height, args.size,
                                      args.water_spacing or color_grid.spacing),
                        "landcover": color_grid, "canopy": color_grid}
-        raster = [x for x in args.layers if x != "buildings"]
+        raster = [x for x in args.layers if x not in ("buildings", "roads")]
         extra = geo_layers.build_layers(raster, layer_grids.__getitem__, grid_bounds(grid),
                                         args.overture_release, CACHE, network, log, sha256_file)
         if "buildings" in args.layers:
@@ -1017,6 +1018,11 @@ def build(args: argparse.Namespace) -> dict:
             surface, ground_model = "dtm-approx", {
                 "method": "DEM filled in under building footprints from the surrounding samples, lowered by half "
                           "the canopy height under trees, never above the DEM (tools/buildings.py)"} | ground_stats
+        if "roads" in args.layers:
+            log("roads:")
+            water = next((x for x in extra if x.key == "water"), None)
+            extra.append(geo_roads.build_roads(grid, height, water, grid_bounds(grid), args.overture_release, CACHE,
+                                               network, log, sha256_file))
         for layer in extra:
             attribution += [a for a in layer.attribution if a not in attribution]
     attribution += args.attribution or []

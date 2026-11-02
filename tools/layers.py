@@ -30,7 +30,7 @@ OSM_ATTRIBUTION = ("© OpenStreetMap contributors, Overture Maps Foundation "
 # and courtyards, not on the terrain surface) and physical (named sea / strait areas, not shorelines).
 WATER_SUBTYPES = ("ocean", "lake", "pond", "reservoir", "river", "water", "canal", "stream")
 SUPERSAMPLE = 4
-LAYERS = ("water", "landcover", "canopy", "buildings")
+LAYERS = ("water", "landcover", "canopy", "buildings", "roads")
 
 WGS84 = pymap3d.Ellipsoid.from_name("wgs84")
 

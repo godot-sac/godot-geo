@@ -35,7 +35,11 @@ var chunks_built := 0
 ## sits near the crown tops.
 var sink := 0.0
 
-var _chunks := {}  # Vector2i -> {"near": MultiMeshInstance3D[], "far": MultiMeshInstance3D}
+var _chunks := {}  # Vector2i -> {"nodes": MultiMeshInstance3D[], "count": trees}
+var _tasks := {}  # Vector2i -> WorkerThreadPool task preparing that chunk
+var _results := {}  # Vector2i -> prepared chunk (worker -> main thread)
+var _lock := Mutex.new()
+const MAX_TASKS := 4
 static var _meshes: Array[ArrayMesh] = []
 var _tree_material: ShaderMaterial
 var _impostor_material: ShaderMaterial
@@ -50,6 +54,7 @@ func has_data() -> bool:
 
 
 func _rebuild() -> void:
+	_wait_tasks()
 	for c in _chunks.values():
 		for mi: Node in c.nodes:
 			mi.queue_free()
@@ -98,15 +103,50 @@ func update_view(camera: Vector3) -> void:
 			var key := Vector2i(i, j)
 			if not _chunks.has(key) and _chunk_center(key).distance_to(cam) < reach:
 				todo.append(key)
-	if todo.is_empty():
-		return
 	todo.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 		return _chunk_center(a).distance_squared_to(cam) < _chunk_center(b).distance_squared_to(cam))
+	if build_budget_ms == INF:  # synchronous (build_all_around)
+		for key in todo:
+			if not _tasks.has(key):
+				_add_chunk(key, prepare_chunk(key))
+		return
 	var t0 := Time.get_ticks_usec()
-	for key in todo:
-		_build_chunk(key)
+	for key: Vector2i in _tasks.keys():
+		if not WorkerThreadPool.is_task_completed(_tasks[key]):
+			continue
+		WorkerThreadPool.wait_for_task_completion(_tasks[key])
+		_tasks.erase(key)
+		_lock.lock()
+		var prepared: Dictionary = _results.get(key, {})
+		_results.erase(key)
+		_lock.unlock()
+		if _chunk_center(key).distance_to(cam) < reach + chunk_size:
+			_add_chunk(key, prepared)
 		if (Time.get_ticks_usec() - t0) / 1000.0 > build_budget_ms:
 			break
+	for key in todo:
+		if _tasks.size() >= MAX_TASKS:
+			break
+		if not _tasks.has(key) and not _chunks.has(key):  # may have been added just above
+			_tasks[key] = WorkerThreadPool.add_task(_prepare.bind(key))
+
+
+func _prepare(key: Vector2i) -> void:
+	var prepared := prepare_chunk(key)
+	_lock.lock()
+	_results[key] = prepared
+	_lock.unlock()
+
+
+func _wait_tasks() -> void:
+	for id: int in _tasks.values():
+		WorkerThreadPool.wait_for_task_completion(id)
+	_tasks.clear()
+	_results.clear()
+
+
+func _exit_tree() -> void:
+	_wait_tasks()
 
 
 ## Builds every chunk around `camera` now (for tests, screenshots and --check runs).
@@ -162,35 +202,58 @@ func chunk_trees(key: Vector2i) -> Array:
 	return out
 
 
-func _build_chunk(key: Vector2i) -> void:
+## MultiMesh buffers of a chunk (pure; runs on worker threads): {count, near: [[species, buffer, n]...],
+## far: buffer}. Buffer layout per instance: 3 x 4 transform rows, colour, (far only) custom data.
+func prepare_chunk(key: Vector2i) -> Dictionary:
 	var trees := chunk_trees(key)
-	var entry := {"nodes": [], "count": trees.size()}
-	_chunks[key] = entry
-	chunks_built += 1
-	tree_count += trees.size()
+	var out := {"count": trees.size(), "near": [], "far": PackedFloat32Array()}
 	if trees.is_empty():
-		return
+		return out
 	var center := _chunk_center(key)
 	var per_species: Array[Array] = [[], [], []]
 	for t: Array in trees:
 		per_species[t[0]].append(t)
-	var far_mm := _multimesh(null, trees.size())
-	far_mm.mesh = _impostor_mesh
+	var far := PackedFloat32Array()
+	far.resize(trees.size() * 20)
 	var k := 0
 	for s in Species.values():
 		var list: Array = per_species[s]
 		if list.is_empty():
 			continue
-		var mm := _multimesh(_meshes[s], list.size())
+		var buf := PackedFloat32Array()
+		buf.resize(list.size() * 16)
 		for i in list.size():
 			var t: Array = list[i]
 			var xf := _transform(t, center)
-			mm.set_instance_transform(i, xf)
-			mm.set_instance_color(i, _tint(s, t[4]))
-			far_mm.set_instance_transform(k, xf)
-			far_mm.set_instance_color(k, _tint(s, t[4]))
-			far_mm.set_instance_custom_data(k, Color(float(s), 0.0, 0.0, 0.0))
+			var col := _tint(s, t[4])
+			var row := [xf.basis.x.x, xf.basis.y.x, xf.basis.z.x, xf.origin.x, xf.basis.x.y, xf.basis.y.y,
+					xf.basis.z.y, xf.origin.y, xf.basis.x.z, xf.basis.y.z, xf.basis.z.z, xf.origin.z,
+					col.r, col.g, col.b, col.a]
+			for q in 16:
+				buf[i * 16 + q] = row[q]
+				far[k * 20 + q] = row[q]
+			far[k * 20 + 16] = float(s)
 			k += 1
+		out.near.append([s, buf, list.size()])
+	out.far = far
+	return out
+
+
+func _add_chunk(key: Vector2i, prepared: Dictionary) -> void:
+	var count: int = prepared.get("count", 0)
+	var entry := {"nodes": [], "count": count}
+	_chunks[key] = entry
+	chunks_built += 1
+	tree_count += count
+	if count == 0:
+		return
+	var center := _chunk_center(key)
+	var far_mm := _multimesh(null, count)
+	far_mm.mesh = _impostor_mesh
+	far_mm.buffer = prepared.far
+	for item: Array in prepared.near:
+		var mm := _multimesh(_meshes[item[0]], item[2])
+		mm.buffer = item[1]
 		var near := MultiMeshInstance3D.new()
 		near.multimesh = mm
 		near.material_override = _tree_material

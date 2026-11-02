@@ -110,6 +110,16 @@ static func detail_textures() -> Array[Texture2DArray]:
 	return out
 
 
+## Road ring `k` (0 near, 1 far): texture painted by GeoRoadLayer over `rect` (local x / z).
+func set_road_ring(k: int, texture: Texture2D, rect: Rect2) -> void:
+	if _material == null:
+		return
+	_material.set_shader_parameter("road_ring%d" % k, texture)
+	_material.set_shader_parameter("road_rect%d" % k, Vector4(rect.position.x, rect.position.y, rect.size.x,
+			rect.size.y))
+	_material.set_shader_parameter("road_enabled", true)
+
+
 func set_water(enabled: bool) -> void:
 	if _material:
 		_material.set_shader_parameter("water_enabled", enabled and package.has_water())

@@ -24,6 +24,11 @@ var buildings_drawn := 0
 var tiles_built := 0
 
 var _tiles := {}  # Vector2i -> MeshInstance3D (null for empty tiles)
+var _tasks := {}  # Vector2i -> WorkerThreadPool task building that tile's arrays
+var _results := {}  # Vector2i -> arrays from a finished task (filled on the worker, read on the main thread)
+var _lock := Mutex.new()
+## Tile meshes are prepared on this many worker threads at a time.
+const MAX_TASKS := 4
 var _wall_mat: ShaderMaterial
 var _roof_mat: ShaderMaterial
 
@@ -33,6 +38,10 @@ func has_data() -> bool:
 
 
 func _rebuild() -> void:
+	for id: int in _tasks.values():
+		WorkerThreadPool.wait_for_task_completion(id)
+	_tasks.clear()
+	_results.clear()
 	for mi in _tiles.values():
 		if mi:
 			mi.queue_free()
@@ -72,15 +81,46 @@ func update_view(camera: Vector3) -> void:
 			if not _tiles.has(key) and data.tile_count(i, j) > 0 \
 					and data.tile_center(i, j).distance_to(cam) < reach:
 				todo.append(key)
-	if todo.is_empty():
-		return
 	todo.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 		return data.tile_center(a.x, a.y).distance_squared_to(cam) < data.tile_center(b.x, b.y).distance_squared_to(cam))
+	if build_budget_ms == INF:  # synchronous (build_all_around)
+		for key in todo:
+			if not _tasks.has(key):
+				_add_tile(key, tile_arrays(data.tile(key.x, key.y), data.tile_center(key.x, key.y), foundation))
+		return
+	# Finished tasks: create the meshes here (main thread) within the frame budget.
 	var t0 := Time.get_ticks_usec()
-	for key in todo:
-		_build_tile(key)
+	for key: Vector2i in _tasks.keys():
+		if not WorkerThreadPool.is_task_completed(_tasks[key]):
+			continue
+		WorkerThreadPool.wait_for_task_completion(_tasks[key])
+		_tasks.erase(key)
+		_lock.lock()
+		var arrays: Variant = _results.get(key)
+		_results.erase(key)
+		_lock.unlock()
+		if data.tile_center(key.x, key.y).distance_to(cam) < reach + data.tile_m:
+			_add_tile(key, arrays)
 		if (Time.get_ticks_usec() - t0) / 1000.0 > build_budget_ms:
 			break
+	for key in todo:
+		if _tasks.size() >= MAX_TASKS:
+			break
+		if not _tasks.has(key) and not _tiles.has(key):  # may have been added just above
+			_tasks[key] = WorkerThreadPool.add_task(_prepare.bind(key))
+
+
+func _exit_tree() -> void:
+	for id: int in _tasks.values():
+		WorkerThreadPool.wait_for_task_completion(id)
+	_tasks.clear()
+
+
+func _prepare(key: Vector2i) -> void:
+	var arrays := tile_arrays(data.tile(key.x, key.y), data.tile_center(key.x, key.y), foundation)
+	_lock.lock()
+	_results[key] = arrays
+	_lock.unlock()
 
 
 ## Builds every tile around `camera` now (tests, screenshots, --check).
@@ -91,14 +131,16 @@ func build_all_around(camera: Vector3) -> void:
 	build_budget_ms = budget
 
 
-func _build_tile(key: Vector2i) -> void:
+func _add_tile(key: Vector2i, arrays: Variant) -> void:
 	var list := data.tile(key.x, key.y)
 	var center := data.tile_center(key.x, key.y)
-	var mesh := tile_mesh(list, center, foundation)
 	tiles_built += 1
-	if mesh == null:
+	if arrays == null:
 		_tiles[key] = null
 		return
+	var mesh := ArrayMesh.new()
+	for a: Array in arrays:
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.set_surface_override_material(0, _wall_mat)
@@ -118,13 +160,24 @@ func _build_tile(key: Vector2i) -> void:
 ## Mesh of a list of buildings relative to `center` (x, z): surface 0 walls (UV = metres along the wall, metres
 ## above the base; colour = facade), surface 1 roofs (colour = roof). Null if there is nothing to draw.
 static func tile_mesh(list: Array, center: Vector2, foundation := 2.0) -> ArrayMesh:
+	var arrays: Variant = tile_arrays(list, center, foundation)
+	if arrays == null:
+		return null
+	var mesh := ArrayMesh.new()
+	for a: Array in arrays:
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
+	return mesh
+
+
+## The surface arrays of tile_mesh (walls, roofs), or null; pure, so it runs on worker threads.
+static func tile_arrays(list: Array, center: Vector2, foundation := 2.0) -> Variant:
 	var w := _Surface.new()
 	var r := _Surface.new()
 	for b: Dictionary in list:
 		_add_building(b, center, foundation, w, r)
 	if w.verts.is_empty() and r.verts.is_empty():
 		return null
-	var mesh := ArrayMesh.new()
+	var out := []
 	for s: _Surface in [w, r]:
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
@@ -135,8 +188,8 @@ static func tile_mesh(list: Array, center: Vector2, foundation := 2.0) -> ArrayM
 		arrays[Mesh.ARRAY_NORMAL] = s.normals
 		arrays[Mesh.ARRAY_TEX_UV] = s.uvs
 		arrays[Mesh.ARRAY_COLOR] = s.colors
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
+		out.append(arrays)
+	return out
 
 
 class _Surface:
