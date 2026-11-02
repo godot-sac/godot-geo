@@ -13,6 +13,10 @@ signal loaded
 
 enum Backend { CDLOD }
 
+## Layer types `auto_layers` may add, in drawing order.
+const LAYER_TYPES: Array[Script] = [preload("res://addons/geo/layers/geo_building_layer.gd"),
+		preload("res://addons/geo/layers/geo_tree_layer.gd")]
+
 ## Package directory (contains terrain.json).
 @export_dir var package_path := "":
 	set(value):
@@ -41,6 +45,8 @@ enum Backend { CDLOD }
 		water = value
 		if _backend:
 			_backend.set_water(value)
+## Add the layers the package has data for (GeoTreeLayer, ...) unless a child of that type already exists.
+@export var auto_layers := true
 @export_group("Collision")
 @export var collision_enabled := true
 ## Edge length of the square collision patch kept around the target, in metres.
@@ -105,9 +111,36 @@ func load_package() -> Error:
 		cs.shape = _shape
 		_body.add_child(cs)
 		add_child(_body, false, INTERNAL_MODE_FRONT)
+	_setup_layers()
 	loaded.emit()
 	_update(true)
 	return OK
+
+
+## The GeoTerrainLayer children (trees, buildings, roads).
+func layers() -> Array[GeoTerrainLayer]:
+	var out: Array[GeoTerrainLayer] = []
+	for c in get_children():
+		if c is GeoTerrainLayer:
+			out.append(c)
+	return out
+
+
+func _setup_layers() -> void:
+	if auto_layers:
+		for script: Script in LAYER_TYPES:
+			var have := layers().any(func(l: GeoTerrainLayer) -> bool: return l.get_script() == script)
+			if have:
+				continue
+			var l: GeoTerrainLayer = script.new()
+			l.package = package
+			if l.has_data():
+				l.name = script.get_global_name().trim_prefix("Geo")
+				add_child(l)
+			else:
+				l.free()
+	for l in layers():
+		l.setup(self)
 
 
 func is_loaded() -> bool:
@@ -119,6 +152,8 @@ func _clear() -> void:
 		if n:
 			remove_child(n)
 			n.queue_free()
+	for l in layers():
+		l.setup(null)
 	_backend = null
 	_body = null
 	_shape = null
@@ -138,6 +173,9 @@ func _update(force: bool) -> void:
 	var cam := _camera()
 	if cam:
 		_backend.update_view(_backend.to_local(cam.global_position))
+		var local := to_package_local(cam.global_position)
+		for l in layers():
+			l.update_view(local)
 	if _body:
 		var target := get_node_or_null(collision_target) as Node3D if not collision_target.is_empty() else cam
 		if target:
@@ -162,6 +200,13 @@ func height_at(x: float, z: float) -> float:
 	if not package.contains(p.x, p.z):
 		return NAN
 	return global_position.y + origin_offset + _backend.surface_height(p.x, p.z)
+
+
+## Surface height in the package frame (x, z, result relative to the package origin); NAN outside the package.
+func surface_height_local(x: float, z: float) -> float:
+	if package == null or not package.contains(x, z):
+		return NAN
+	return _backend.surface_height(x, z)
 
 
 ## Share of the ground around global x, z that is water (0..1, from the package's water layer); 0 without one,

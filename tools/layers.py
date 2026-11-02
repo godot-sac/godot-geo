@@ -30,7 +30,7 @@ OSM_ATTRIBUTION = ("© OpenStreetMap contributors, Overture Maps Foundation "
 # and courtyards, not on the terrain surface) and physical (named sea / strait areas, not shorelines).
 WATER_SUBTYPES = ("ocean", "lake", "pond", "reservoir", "river", "water", "canal", "stream")
 SUPERSAMPLE = 4
-LAYERS = ("water",)
+LAYERS = ("water", "landcover", "canopy", "buildings")
 
 WGS84 = pymap3d.Ellipsoid.from_name("wgs84")
 
@@ -39,9 +39,10 @@ WGS84 = pymap3d.Ellipsoid.from_name("wgs84")
 class Layer:
     key: str
     file: str
-    image: np.ndarray  # uint8, rows = north to south
+    image: np.ndarray | None  # uint8, rows = north to south; None for a binary layer
     meta: dict
     attribution: list[str] = field(default_factory=list)
+    data: bytes | None = None  # file content of a binary layer
 
 
 # --- Overture ---------------------------------------------------------------------------------------------------
@@ -124,6 +125,143 @@ def _clip(geoms: np.ndarray, grid) -> np.ndarray:
     return shapely.clip_by_rect(geoms, -m, -m, m, m)
 
 
+# --- global rasters (3 x 3 degree COG tiles, read by window over HTTP range requests) ---------------------------
+
+WORLDCOVER_URL = ("https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/"
+                  "ESA_WorldCover_10m_2021_v200_{tile}_Map.tif")
+WORLDCOVER_ATTRIBUTION = ("© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) "
+                          "processed by ESA WorldCover consortium (CC BY 4.0)")
+CANOPY_URL = ("https://libdrive.ethz.ch/index.php/s/cO8or7iOe5dT2Rt/download?path=%2F3deg_cogs&files="
+              "ETH_GlobalCanopyHeight_10m_2020_{tile}_Map.tif")
+CANOPY_ATTRIBUTION = ("Canopy height: Lang, N., Jetz, W., Schindler, K., Wegner, J. D. (2023), A high-resolution "
+                      "canopy height model of the Earth, Nature Ecology & Evolution; ETH Global Canopy Height 2020, "
+                      "doi:10.3929/ethz-b-000609802 (CC BY 4.0)")
+# WorldCover classes (value: name); 0 = no data.
+WORLDCOVER_CLASSES = {10: "tree cover", 20: "shrubland", 30: "grassland", 40: "cropland", 50: "built-up",
+                      60: "bare / sparse vegetation", 70: "snow and ice", 80: "permanent water bodies",
+                      90: "herbaceous wetland", 95: "mangroves", 100: "moss and lichen"}
+
+
+def tile3(lat: float, lon: float) -> str:
+    """Name of the 3 x 3 degree tile (south-west corner) containing the point, e.g. N39E027."""
+    la = int(np.floor(lat / 3.0)) * 3
+    lo = int(np.floor(lon / 3.0)) * 3
+    return f"{'N' if la >= 0 else 'S'}{abs(la):02d}{'E' if lo >= 0 else 'W'}{abs(lo):03d}"
+
+
+def _grid_lat_lon(grid, r0: int, r1: int) -> tuple[np.ndarray, np.ndarray]:
+    e = np.broadcast_to(grid.east()[None, :], (r1 - r0, grid.count))
+    n = np.broadcast_to(grid.north()[r0:r1, None], (r1 - r0, grid.count))
+    lat, lon, _ = pymap3d.enu2geodetic(e, n, np.zeros(e.shape), grid.lat0, grid.lon0, grid.h0, WGS84)
+    return lat, (lon + 180.0) % 360.0 - 180.0
+
+
+def _http_status(url: str) -> int:
+    import urllib.error
+    import urllib.request
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=60) as r:
+            return r.status
+    except urllib.error.HTTPError as err:
+        return err.code
+
+
+def read_tile_window(url: str, name: str, bounds, cache: Path, network, log):
+    """Window of a lon/lat COG covering bounds (lat_min, lat_max, lon_min, lon_max), cached as .npz.
+    Returns (2-D array, rasterio Affine) or None if the tile does not exist."""
+    import rasterio
+    from rasterio.windows import from_bounds
+
+    lat_min, lat_max, lon_min, lon_max = bounds
+    key = hashlib.sha256(f"{url}|{lat_min:.6f},{lat_max:.6f},{lon_min:.6f},{lon_max:.6f}".encode()).hexdigest()[:16]
+    path = cache / "rasters" / f"{name}-{key}.npz"
+    if path.exists():
+        z = np.load(path)
+        return z["data"], Affine(*z["transform"])
+    network(f"{name}")
+    env = dict(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", GDAL_HTTP_MAX_RETRY="3", GDAL_HTTP_RETRY_DELAY="2")
+    with rasterio.Env(**env):
+        try:
+            ds = rasterio.open(url)
+        except rasterio.errors.RasterioIOError:
+            if _http_status(url) in (403, 404):  # no tile there (open sea)
+                return None
+            raise
+        with ds:
+            win = from_bounds(lon_min, lat_min, lon_max, lat_max, transform=ds.transform)
+            win = win.round_offsets().round_lengths()
+            log(f"  reading {name} window {int(win.width)}x{int(win.height)}")
+            data = ds.read(1, window=win, boundless=True, fill_value=ds.nodata or 0)
+            transform = ds.window_transform(win)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(path, data=data, transform=np.array(transform)[:6])
+    return data, transform
+
+
+def sample_tiles_nearest(grid, url_fmt: str, label: str, bounds, cache: Path, network, log, fill: int = 0,
+                         band_rows: int = 512) -> tuple[np.ndarray, list[str]]:
+    """Nearest-neighbour sample of a 3-degree-tiled lon/lat raster at every grid point (uint8)."""
+    lat_min, lat_max, lon_min, lon_max = bounds
+    tiles = sorted({tile3(a, b) for a in (lat_min, lat_max) for b in (lon_min, lon_max)})
+    windows = {}
+    for t in tiles:
+        r = read_tile_window(url_fmt.format(tile=t), f"{label}_{t}", bounds, cache, network, log)
+        if r is not None:
+            windows[t] = r
+    out = np.full((grid.count, grid.count), fill, np.uint8)
+    for r0 in range(0, grid.count, band_rows):
+        r1 = min(grid.count, r0 + band_rows)
+        lat, lon = _grid_lat_lon(grid, r0, r1)
+        names = np.vectorize(tile3)(lat, lon) if len(windows) > 1 else np.full(lat.shape, tiles[0])
+        for t, (data, tr) in windows.items():
+            m = names == t
+            col = np.floor((lon[m] - tr.c) / tr.a).astype(np.int64)
+            row = np.floor((lat[m] - tr.f) / tr.e).astype(np.int64)
+            ok = (row >= 0) & (row < data.shape[0]) & (col >= 0) & (col < data.shape[1])
+            vals = np.full(m.sum(), fill, np.uint8)
+            vals[ok] = data[row[ok], col[ok]]
+            band = out[r0:r1]
+            band[m] = vals
+    return out, list(windows)
+
+
+def build_landcover(grid, bounds, cache: Path, network, log, sha256_file) -> Layer:
+    image, tiles = sample_tiles_nearest(grid, WORLDCOVER_URL, "worldcover", bounds, cache, network, log)
+    vals, counts = np.unique(image, return_counts=True)
+    shares = {WORLDCOVER_CLASSES.get(int(v), f"class {v}"): round(float(c) / image.size, 4)
+              for v, c in zip(vals, counts)}
+    log(f"  landcover: {shares}")
+    meta = {
+        "encoding": "PNG L8, ESA WorldCover 2021 class value (10 tree cover, 20 shrubland, 30 grassland, "
+                    "40 cropland, 50 built-up, 60 bare, 70 snow and ice, 80 water, 90 wetland, 95 mangroves, "
+                    "100 moss and lichen; 0 no data), nearest neighbour",
+        "samples": grid.count, "spacing_m": grid.spacing,
+        "source": {"product": "ESA WorldCover 10 m 2021 v200", "access": "s3://esa-worldcover/v200/2021/map",
+                   "tiles": [f"ESA_WorldCover_10m_2021_v200_{t}_Map.tif" for t in tiles],
+                   "citation": "Zanaga, D. et al. (2022) ESA WorldCover 10 m 2021 v200, doi:10.5281/zenodo.7254221"},
+        "license": "CC-BY-4.0",
+        "shares": shares,
+    }
+    return Layer("landcover", "landcover.png", image, meta, [WORLDCOVER_ATTRIBUTION])
+
+
+def build_canopy(grid, bounds, cache: Path, network, log, sha256_file) -> Layer:
+    raw, tiles = sample_tiles_nearest(grid, CANOPY_URL, "eth_canopy", bounds, cache, network, log, fill=255)
+    metres = np.where(raw == 255, 0, raw).astype(np.float32)  # 255 = no data
+    image = np.clip(np.round(metres * 4.0), 0, 255).astype(np.uint8)
+    log(f"  canopy: {float((metres >= 3).mean()) * 100:.1f} % of the area >= 3 m, max {metres.max():.0f} m")
+    meta = {
+        "encoding": "PNG L8, canopy top height above ground in quarter metres (value / 4 = metres, 0..63.75), "
+                    "nearest neighbour; no data = 0",
+        "samples": grid.count, "spacing_m": grid.spacing,
+        "source": {"product": "ETH Global Canopy Height 10 m 2020 (Lang et al. 2023)",
+                   "access": "libdrive.ethz.ch 3deg_cogs",
+                   "tiles": [f"ETH_GlobalCanopyHeight_10m_2020_{t}_Map.tif" for t in tiles]},
+        "license": "CC-BY-4.0",
+    }
+    return Layer("canopy", "canopy.png", image, meta, [CANOPY_ATTRIBUTION])
+
+
 # --- layers -----------------------------------------------------------------------------------------------------
 
 def build_water(grid, bounds, release: str, cache: Path, network, log, sha256_file) -> Layer:
@@ -157,4 +295,8 @@ def build_layers(names: list[str], grid_for, bounds, release: str, cache: Path, 
         log(f"{name}:")
         if name == "water":
             out.append(build_water(grid_for(name), bounds, release, cache, network, log, sha256_file))
+        elif name == "landcover":
+            out.append(build_landcover(grid_for(name), bounds, cache, network, log, sha256_file))
+        elif name == "canopy":
+            out.append(build_canopy(grid_for(name), bounds, cache, network, log, sha256_file))
     return out

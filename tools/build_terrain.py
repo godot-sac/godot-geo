@@ -43,6 +43,7 @@ from rasterio.windows import Window, from_bounds
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I leaves the script directory off sys.path
 import dted  # noqa: E402
+import buildings as geo_buildings  # noqa: E402
 import layers as geo_layers  # noqa: E402
 
 VERSION = "0.1.0"
@@ -885,6 +886,9 @@ class Sources:
     imagery: dict
     attribution: list[str] = field(default_factory=list)
     disclaimer: str = ""
+    # "dsm": the DEM as it is (roofs and crowns included); "dtm-approx": buildings and part of the canopy removed
+    surface: str = "dsm"
+    ground_model: dict | None = None
 
 
 def write_package(out: Path, grid: Grid, color_grid: Grid, height: np.ndarray, color: np.ndarray,
@@ -894,7 +898,10 @@ def write_package(out: Path, grid: Grid, color_grid: Grid, height: np.ndarray, c
     write_exr(out / "height.exr", height)
     Image.fromarray(color).save(out / "color.png")
     for layer in extra or []:
-        Image.fromarray(layer.image, mode="L").save(out / layer.file)
+        if layer.data is not None:
+            (out / layer.file).write_bytes(layer.data)
+        else:
+            Image.fromarray(layer.image, mode="L").save(out / layer.file)
     meta = {
         "format": PACKAGE_FORMAT,
         "format_version": PACKAGE_FORMAT_VERSION,
@@ -910,8 +917,9 @@ def write_package(out: Path, grid: Grid, color_grid: Grid, height: np.ndarray, c
             "min": float(height.min()), "max": float(height.max()),
             "reference": "ENU up relative to the origin; geoid and Earth curvature included",
             "interpolation": "bilinear between samples",
+            "surface": sources.surface,
             "sha256": sha256_file(out / "height.exr"),
-        },
+        } | ({"ground_model": sources.ground_model} if sources.ground_model else {}),
         "color": {
             "file": "color.png", "encoding": f"PNG RGB8, sRGB ({sources.imagery['product']})",
             "samples": color_grid.count, "spacing_m": color_grid.spacing,
@@ -990,18 +998,30 @@ def build(args: argparse.Namespace) -> dict:
         years = sorted({s["datetime"][:4] for s in scenes})
         attribution.append(f"Contains modified Copernicus Sentinel data {', '.join(years)}")
     extra = []
+    surface, ground_model = "dsm", None
     if args.layers:
         layer_grids = {"water": Grid(args.lat, args.lon, args.origin_height, args.size,
-                                     args.water_spacing or color_grid.spacing)}
-        extra = geo_layers.build_layers(args.layers, layer_grids.__getitem__, grid_bounds(grid),
+                                     args.water_spacing or color_grid.spacing),
+                       "landcover": color_grid, "canopy": color_grid}
+        raster = [x for x in args.layers if x != "buildings"]
+        extra = geo_layers.build_layers(raster, layer_grids.__getitem__, grid_bounds(grid),
                                         args.overture_release, CACHE, network, log, sha256_file)
+        if "buildings" in args.layers:
+            log("buildings:")
+            canopy = next((x for x in extra if x.key == "canopy"), None)
+            height, blayer, ground_stats = geo_buildings.build_buildings(
+                grid, height, canopy, grid_bounds(grid), args.overture_release, CACHE, network, log, sha256_file)
+            extra += blayer
+            surface, ground_model = "dtm-approx", {
+                "method": "DEM filled in under building footprints from the surrounding samples, lowered by half "
+                          "the canopy height under trees, never above the DEM (tools/buildings.py)"} | ground_stats
         for layer in extra:
             attribution += [a for a in layer.attribution if a not in attribution]
     attribution += args.attribution or []
     if (args.dem or args.imagery not in (None, ["hillshade"])) and not args.attribution:
         log("  note: no --attribution given; add the notice your data's licence requires")
     meta = write_package(Path(args.out), grid, color_grid, height, color,
-                         Sources(elevation, geoids, imagery, attribution, disclaimer), extra)
+                         Sources(elevation, geoids, imagery, attribution, disclaimer, surface, ground_model), extra)
     log(f"done in {time.time() - t0:.0f} s: {args.out} (heights {meta['height']['min']:.1f} .. "
         f"{meta['height']['max']:.1f} m)")
     if NETWORK_USED:

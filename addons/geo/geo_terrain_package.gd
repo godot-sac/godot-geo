@@ -25,7 +25,13 @@ var color_spacing := 0.0
 var color_samples := 0
 var height_min := 0.0
 var height_max := 0.0
-## Optional water layer (terrain.json "water"): coverage 0..255, FORMAT_L8, row 0 = north edge; null if absent.
+## Optional 8-bit raster layers (terrain.json key -> FORMAT_L8 Image, row 0 = north edge) and their spacing:
+## "water" (coverage, 255 = water), "landcover" (ESA WorldCover class value), "canopy" (tree height, metres x 4),
+## "footprints" (255 under building footprints).
+const LAYER_KEYS := ["water", "landcover", "canopy", "footprints"]
+var layers := {}
+var layer_spacing := {}
+## The water layer (also in `layers`); null if absent.
 var water: Image
 var water_samples := 0
 var water_spacing := 0.0
@@ -85,21 +91,45 @@ func _load(dir: String, verify: bool) -> String:
 	if color == null or color.get_size() != Vector2i(color_samples, color_samples):
 		return "%s: missing or wrong size" % meta.color.file
 
-	if meta.has("water"):
-		var file := dir.path_join(meta.water.file)
-		if verify and FileAccess.get_sha256(file) != meta.water.sha256:
+	for key in LAYER_KEYS:
+		if not meta.has(key):
+			continue
+		var file := dir.path_join(meta[key].file)
+		if verify and FileAccess.get_sha256(file) != meta[key].sha256:
 			return "%s: SHA-256 does not match terrain.json" % file
-		water = Image.load_from_file(_global(file))
-		water_samples = int(meta.water.samples)
-		water_spacing = float(meta.water.spacing_m)
-		if water == null or water.get_size() != Vector2i(water_samples, water_samples):
-			return "%s: missing or wrong size" % meta.water.file
-		water.convert(Image.FORMAT_L8)
+		var img := Image.load_from_file(_global(file))
+		var n := int(meta[key].samples)
+		if img == null or img.get_size() != Vector2i(n, n):
+			return "%s: missing or wrong size" % meta[key].file
+		img.convert(Image.FORMAT_L8)
+		layers[key] = img
+		layer_spacing[key] = float(meta[key].spacing_m)
+	water = layers.get("water")
+	if water:
+		water_samples = water.get_width()
+		water_spacing = layer_spacing.water
 	return ""
 
 
 func has_water() -> bool:
 	return water != null
+
+
+func has_layer(key: String) -> bool:
+	return layers.has(key)
+
+
+## Raw 8-bit value of layer `key` at the sample nearest to local x, z (0 if the package has no such layer).
+func layer_value(key: String, x: float, z: float) -> int:
+	var img: Image = layers.get(key)
+	if img == null:
+		return 0
+	var s: float = layer_spacing[key]
+	var n := img.get_width()
+	var half := size_m * 0.5
+	var c := clampi(roundi((x + half) / s), 0, n - 1)
+	var r := clampi(roundi((z + half) / s), 0, n - 1)
+	return img.get_pixel(c, r).r8
 
 
 ## Share of the cell around local x, z covered by water (0..1, bilinear), 0 without a water layer.

@@ -30,6 +30,7 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	_place_sun()
 	var t0 := Time.get_ticks_msec()
+	terrain.ground_detail = float(_arg(args, "--detail", str(terrain.ground_detail)))
 	var pkg := _arg(args, "--package", "")
 	for p: String in ([pkg] if not pkg.is_empty() else PACKAGES):
 		if FileAccess.file_exists(p.path_join("terrain.json")):
@@ -105,6 +106,11 @@ func _tour(out_dir: String) -> void:
 	var stats := {"package": terrain.package_path, "places": {}}
 	for i in places.size():
 		_go_to(i)
+		var t_build := Time.get_ticks_msec()
+		for l in terrain.layers():
+			if l.has_method(&"build_all_around"):
+				l.build_all_around(terrain.to_package_local(camera.global_position))
+		var build_ms := Time.get_ticks_msec() - t_build
 		for f in 30:
 			await get_tree().process_frame
 		var t0 := Time.get_ticks_usec()
@@ -118,12 +124,25 @@ func _tour(out_dir: String) -> void:
 			"frame_ms": snappedf(ms, 0.01),
 			"primitives": Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
 			"draw_calls": Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			"layer_build_ms": build_ms,
+			"layers": _layer_counts(),
 		}
 	stats["video_mem_mb"] = snappedf(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0, 0.1)
 	var f := FileAccess.open(out_dir.path_join("stats.json"), FileAccess.WRITE)
 	f.store_string(JSON.stringify(stats, "  "))
 	print(JSON.stringify(stats, "  "))
 	get_tree().quit()
+
+
+## Instances per layer around the camera (trees, buildings, ...), for reports and the F3 line.
+func _layer_counts() -> Dictionary:
+	var out := {}
+	for l in terrain.layers():
+		if l is GeoTreeLayer:
+			out["trees"] = l.tree_count
+		elif l is GeoBuildingLayer:
+			out["buildings"] = l.buildings_drawn
+	return out
 
 
 func _unhandled_input(event: InputEvent) -> void:

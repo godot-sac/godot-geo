@@ -20,6 +20,19 @@ uniform float color_samples;
 // Procedural detail near the camera (not data): breaks up the 10 m imagery when seen from a few metres. 0 = off.
 uniform float detail_strength = 0.0;
 uniform float detail_distance = 800.0;
+// Land cover detail: ESA WorldCover class per sample picks a detail texture (own procedural set, 8 slices) that
+// modulates the imagery near the camera; the imagery keeps the colour (detail slices have mean 0.5).
+uniform bool landcover_enabled = false;
+uniform sampler2D landcover_map : filter_nearest, repeat_disable;
+uniform float landcover_scale = 1.0; // height spacing / land cover spacing
+uniform float landcover_samples = 1.0;
+// Mean 0.5 per channel as stored (not sRGB-decoded), so 2 * detail averages 1 and keeps the imagery brightness.
+uniform sampler2DArray detail_albedo : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2DArray detail_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+// Built-up ground under 3D buildings: share of the street tone mixed in (0 = imagery only) and its range.
+uniform float urban_ground = 0.0;
+uniform float urban_distance = 4000.0;
+uniform vec3 urban_color : source_color = vec3(0.36, 0.35, 0.34);
 // Water layer: coverage mask (1 = water) on its own grid. The surface is the terrain itself (the DEM is at water
 // level there); only the shading changes: wave normals near the camera, low roughness, a darker colour.
 uniform bool water_enabled = false;
@@ -114,6 +127,30 @@ vec2 wave_slope(vec2 m, float t, float fp) {
 	return s;
 }
 
+// WorldCover class value / 10 -> detail slice: 0 forest floor, 1 shrub, 2 grass, 3 crop, 4 built-up, 5 bare,
+// 6 snow, 7 wetland. No data -> grass, water (shore pixels) -> bare, mangrove -> wetland, moss -> shrub.
+const int LC_SLICE[11] = int[](2, 0, 1, 2, 3, 4, 5, 6, 5, 7, 1);
+// Metres covered by one repeat of each slice.
+const float SLICE_SIZE[8] = float[](4.0, 4.0, 3.0, 8.0, 6.0, 4.0, 8.0, 6.0);
+
+int landcover_slice(ivec2 c) {
+	int n = int(landcover_samples);
+	float v = texelFetch(landcover_map, clamp(c, ivec2(0), ivec2(n - 1)), 0).r;
+	return LC_SLICE[clamp(int(v * 255.0 + 0.5) / 10, 0, 10)];
+}
+
+// Detail albedo factor (mean 1) and normal offset of slice s at position m (metres); a second, larger and rotated
+// repeat of the same slice breaks up the tiling.
+void slice_detail(int s, vec2 m, out vec3 f, out vec2 dn) {
+	float size = SLICE_SIZE[s];
+	vec2 m2 = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * m / 3.7;
+	vec3 a = texture(detail_albedo, vec3(m / size, float(s))).rgb;
+	vec3 b = texture(detail_albedo, vec3(m2 / size, float(s))).rgb;
+	f = 2.0 * a * mix(vec3(1.0), 2.0 * b, 0.5);
+	vec3 nt = texture(detail_normal, vec3(m / size, float(s))).rgb * 2.0 - 1.0;
+	dn = vec2(nt.x, -nt.y);
+}
+
 void fragment() {
 	vec2 p = grid_pos;
 	// Sample the normal from the mip whose texels are about one pixel, so distant slopes do not shimmer.
@@ -127,9 +164,54 @@ void fragment() {
 		float fade = 1.0 - smoothstep(detail_distance * 0.4, detail_distance, length(VERTEX));
 		if (fade > 0.0) {
 			vec2 m = p * spacing; // metres
-			float dn = 0.5 * value_noise(m * 0.35) + 0.3 * value_noise(m * 1.7) + 0.2 * value_noise(m * 6.0);
-			albedo *= mix(1.0, 0.7 + 0.6 * dn, detail_strength * fade);
+			if (landcover_enabled) {
+				// Blend the detail of the four nearest land cover samples; noise bends the class borders and the
+				// smoothstep keeps the transition a few metres wide.
+				vec2 jitter = vec2(value_noise(m * 0.11), value_noise(m * 0.11 + 17.3)) - 0.5;
+				vec2 q = p * landcover_scale + jitter * 0.9;
+				ivec2 c = ivec2(floor(q));
+				vec2 t = smoothstep(0.25, 0.75, fract(q));
+				int s00 = landcover_slice(c);
+				int s10 = landcover_slice(c + ivec2(1, 0));
+				int s01 = landcover_slice(c + ivec2(0, 1));
+				int s11 = landcover_slice(c + ivec2(1, 1));
+				vec3 f;
+				vec2 dn;
+				slice_detail(s00, m, f, dn);
+				if (s10 != s00 || s01 != s00 || s11 != s00) {
+					vec3 f1; vec3 f2; vec3 f3;
+					vec2 d1; vec2 d2; vec2 d3;
+					slice_detail(s10, m, f1, d1);
+					slice_detail(s01, m, f2, d2);
+					slice_detail(s11, m, f3, d3);
+					f = mix(mix(f, f1, t.x), mix(f2, f3, t.x), t.y);
+					dn = mix(mix(dn, d1, t.x), mix(d2, d3, t.x), t.y);
+				}
+				float k = detail_strength * fade;
+				albedo *= mix(vec3(1.0), f, k);
+				n = normalize(n + vec3(dn.x, 0.0, dn.y) * 0.6 * k);
+				NORMAL = normalize(mat3(VIEW_MATRIX) * mat3(MODEL_MATRIX) * n);
+			} else {
+				float dn = 0.5 * value_noise(m * 0.35) + 0.3 * value_noise(m * 1.7) + 0.2 * value_noise(m * 6.0);
+				albedo *= mix(1.0, 0.7 + 0.6 * dn, detail_strength * fade);
+			}
 		}
+	}
+	if (urban_ground > 0.0 && landcover_enabled) {
+		// With 3D buildings standing on it, the built-up class shows the ground between them; the 10 m imagery there
+		// is mostly roofs, so pull it towards street and pavement tones out to where buildings are drawn.
+		vec2 q = p * landcover_scale;
+		ivec2 c = ivec2(floor(q));
+		vec2 t = fract(q);
+		float b00 = float(landcover_slice(c) == 4);
+		float b10 = float(landcover_slice(c + ivec2(1, 0)) == 4);
+		float b01 = float(landcover_slice(c + ivec2(0, 1)) == 4);
+		float b11 = float(landcover_slice(c + ivec2(1, 1)) == 4);
+		float wb = mix(mix(b00, b10, t.x), mix(b01, b11, t.x), t.y);
+		float fade = 1.0 - smoothstep(urban_distance * 0.7, urban_distance, length(VERTEX));
+		float lum = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
+		vec3 street = urban_color * (0.75 + 0.5 * clamp(lum / 0.25, 0.0, 1.5));
+		albedo = mix(albedo, street, wb * fade * urban_ground);
 	}
 	float roughness = 0.95;
 	float specular = 0.2;
