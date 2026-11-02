@@ -1,5 +1,6 @@
-# Runs the Godot (GUT) tests on Windows and Linux and the package builder tests (pytest) on Linux, then packs
-# addons/geo as one artifact.
+# Runs the Godot (GUT) tests on Windows and Linux and the package builder tests (pytest) on Linux, then packs the
+# release zips (tools/package_release.py) and installs them into an empty project (tools/check_package.py).
+# On a v* tag it also builds the Ankara 40 km terrain package and attaches everything to a draft GitHub release.
 name: CI
 
 on:
@@ -67,16 +68,65 @@ jobs:
         run: tools/.venv/bin/python -m pytest tests/python -q -p no:cacheprovider
 
   package:
-    name: Addon package
+    name: Release zips
     needs: [godot, python]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Assemble addons/geo
+      - name: Version
         run: |
-          cp LICENSE THIRD_PARTY_NOTICES.md addons/geo/
-          find addons/geo -type f | sort
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else echo "VERSION=dev-${GITHUB_SHA::7}" >> "$GITHUB_ENV"; fi
+      - name: Pack addon and sample terrain
+        run: python3 tools/package_release.py --version "$VERSION"
+      - name: Download Godot
+        run: |
+          curl -sSfL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          python3 -m zipfile -e godot.zip godot_bin
+          chmod +x "godot_bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+      - name: Install into an empty project
+        run: |
+          python3 tools/check_package.py "build/release/godot-geo-$VERSION.zip" build/release/godot-geo-terrain-samples.zip \
+            --godot "godot_bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
       - uses: actions/upload-artifact@v4
         with:
-          name: godot-geo-addon
-          path: addons/geo
+          name: godot-geo-${{ env.VERSION }}
+          path: |
+            build/release/*.zip
+            build/release/SHA256SUMS.txt
+
+  release:
+    name: Draft release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            tools/.cache
+            ~/.local/share/proj
+          key: geo-release-${{ hashFiles('tools/package_release.py', 'tools/requirements.txt') }}
+          restore-keys: geo-data-
+      - name: Install
+        run: |
+          python -m venv tools/.venv
+          tools/.venv/bin/python -m pip install --quiet -r tools/requirements.txt
+          tools/.venv/bin/python -I tools/build_terrain.py --fetch-geoid
+      # The Sentinel-2 scene is pinned in tools/package_release.py, so the package matches the one checked locally.
+      - name: Build release assets
+        run: tools/.venv/bin/python -I tools/package_release.py --version "${GITHUB_REF_NAME#v}" --terrain
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Release notes: the CHANGELOG section of this version.
+          awk -v h="## [${GITHUB_REF_NAME#v}]" 'index($0, h) == 1 {on = 1; next} on && /^## \[/ {exit} on' CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" --draft --title "godot-geo $GITHUB_REF_NAME" --notes-file notes.md \
+            build/release/*.zip build/release/SHA256SUMS.txt

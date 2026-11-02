@@ -26,3 +26,6 @@ prototypes/phase0/shots_tmp/
 addons/dis
 addons/milsymbol
 demo/dis
+
+# Release assets (tools/package_release.py)
+build/
