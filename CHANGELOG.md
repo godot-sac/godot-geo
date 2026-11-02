@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Versions follow [semver](https://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- `line_of_sight`, `raycast`, `viewshed` and `GeoVisibility.trace` return at once for NaN / infinite inputs (an end
+  point outside the package from `height_at`) instead of looping forever; results carry `error`.
+- Freeing a `GeoTerrain` no longer leaves its internal children as orphans (they were queue-freed outside the tree).
+- Layers create no render resources under the headless display server (dummy renderer errors: "wrong RID",
+  "multimesh is null").
+
 ### Added
 - Water layer: `build_terrain.py --layers water [--water-spacing]` rasterises Overture Maps `base/water` polygons
   (OpenStreetMap coastline, lakes, rivers; read with pyarrow from the public bucket, cached) into `water.png`, an
@@ -26,6 +33,8 @@ All notable changes to this project are documented here. Versions follow [semver
   (one picture per bookmark + frame times), `--check` (layers, counts, frame times, known lines of sight, exit code),
   `--bench` (fixed route at 150 m and 500 m, frame time percentiles); `demo/places_sheet.py` contact sheet. The
   visibility demo prefers `terrain/uskudar_10km`.
+- `demo/dis3d.tscn` moved to Üsküdar with the godot-dis exercise (origin 41.02 N 29.05 E, 60 km package first,
+  ships on the water surface, patrol boat view, new screenshots).
 - Test package `tests/data/uskudar_small` (3 km, Üsküdar seafront, with all layers; ODbL for the OpenStreetMap
   derived files).
 - `tools/build_terrain.py`: builds a terrain package (height EXR, Sentinel-2 colour PNG, `terrain.json`) on the local

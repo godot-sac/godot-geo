@@ -77,10 +77,6 @@ func _ready() -> void:
 		load_package()
 
 
-func _exit_tree() -> void:
-	_clear()
-
-
 ## Loads `package_path` and builds the terrain. Returns OK or an error (also pushed as an engine error).
 func load_package() -> Error:
 	_clear()
@@ -150,10 +146,12 @@ func is_loaded() -> bool:
 
 
 func _clear() -> void:
+	# Freed at once: a node waiting in queue_free outside the tree counts as an orphan (and leaks if the tree goes).
+	# Leaving the tree does not clear anything; the internal children are freed with this node.
 	for n: Node in [_backend, _body]:
 		if n:
 			remove_child(n)
-			n.queue_free()
+			n.free()
 	for l in layers():
 		l.setup(null)
 	_backend = null

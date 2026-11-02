@@ -76,6 +76,9 @@ static func trace(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, refraction := 
 		tolerance := 0.0) -> Dictionary:
 	var out := {"blocked": false, "t_hit": -1.0, "min_clearance": INF, "t_min": -1.0, "partial": false,
 			"tested": false}
+	if not (a.is_finite() and b.is_finite()):  # e.g. a height_at() of a point outside the package (NaN)
+		out.partial = true
+		return out
 	var data := pkg.height_data
 	var n := pkg.samples
 	var cells := float(n - 1)
@@ -160,6 +163,8 @@ static func trace(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, refraction := 
 ## Line of sight between local points a and b. See GeoTerrain.line_of_sight.
 static func line_of_sight(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, refraction := 0.0,
 		tolerance := 0.001, mask := ALL) -> Dictionary:
+	if not (a.is_finite() and b.is_finite()):
+		return invalid_line(a, b)
 	var tr := trace(pkg, a, b, refraction, false, tolerance)
 	var blocked: bool = tr.blocked and (mask & TERRAIN) != 0
 	var t_hit: float = tr.t_hit if blocked else 1.0
@@ -185,11 +190,20 @@ static func line_of_sight(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, refrac
 	return out
 
 
+## Result of line_of_sight for an end point that is NaN or infinite (often the height_at() of a point outside the
+## package): not visible, nothing tested, `error` set. No engine error is pushed (callers may meet this every frame).
+static func invalid_line(a: Vector3, b: Vector3) -> Dictionary:
+	return {"visible": false, "point": a, "distance": NAN, "clearance": NAN, "clearance_point": a, "partial": true,
+			"obstacle": "", "error": "end point is not finite: %s -> %s" % [a, b]}
+
+
 ## First building or tree crown on the segment a -> b before `t_max` (0..1): {hit, t, obstacle ("building" /
 ## "tree"), id (buildings)}. Tree crowns are solid from the ground to the canopy height of their 10 m sample (see
 ## GeoTerrainPackage.tree_height_at), sampled every half land cover sample along the segment.
 static func obstacle_hit(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, t_max := 1.0, mask := ALL) -> Dictionary:
 	var best := {"hit": false, "t": t_max}
+	if not (a.is_finite() and b.is_finite()) or is_nan(t_max):
+		return best
 	if mask & BUILDINGS:
 		var bd := pkg.buildings_data()
 		if bd:
@@ -216,6 +230,9 @@ static func obstacle_hit(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, t_max :
 ## First intersection of the ray from local `from` along `direction`. See GeoTerrain.raycast.
 static func raycast(pkg: GeoTerrainPackage, from: Vector3, direction: Vector3, max_distance := 1.0e7,
 		mask := ALL) -> Dictionary:
+	if not (from.is_finite() and direction.is_finite()) or direction.is_zero_approx() or is_nan(max_distance):
+		return {"hit": false, "position": from, "distance": INF, "normal": Vector3.UP,
+				"error": "origin or direction is not finite (or zero)"}
 	var dir := direction.normalized()
 	# Shorten the ray to the package's square so the walk does not count lines far outside it.
 	var half := pkg.size_m * 0.5
@@ -251,6 +268,8 @@ static func raycast(pkg: GeoTerrainPackage, from: Vector3, direction: Vector3, m
 ## is visible if any ray sees a point of it. Cost: about 2 * resolution^2 * max(1, pixel size / sample spacing).
 static func viewshed(pkg: GeoTerrainPackage, observer: Vector3, radius: float, target_height := 0.0,
 		resolution := 256, refraction := 0.0, mask := ALL) -> Image:
+	if not observer.is_finite() or not is_finite(radius) or radius <= 0.0:
+		return null  # a NaN eye (outside the package) would never finish the sweep
 	var res := maxi(resolution, 2)
 	var cell := 2.0 * radius / res
 	var tops := obstacle_tops(pkg, Rect2(observer.x - radius, observer.z - radius, 2.0 * radius, 2.0 * radius), res,

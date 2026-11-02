@@ -134,7 +134,7 @@ func update_view(camera: Vector3) -> void:
 func _prepare(key: Vector2i) -> void:
 	var prepared := prepare_chunk(key)
 	# Upload the instance buffers here as well (RenderingServer calls are thread-safe).
-	if prepared.count > 0:
+	if prepared.count > 0 and can_draw():
 		var far := _multimesh(null, prepared.count)
 		far.mesh = _impostor_mesh
 		far.buffer = prepared.far
@@ -257,7 +257,7 @@ func _add_chunk(key: Vector2i, prepared: Dictionary) -> void:
 	_chunks[key] = entry
 	chunks_built += 1
 	tree_count += count
-	if count == 0:
+	if count == 0 or not can_draw():
 		return
 	var center := _chunk_center(key)
 	var far_mm: MultiMesh = prepared.get("far_mm")

@@ -169,9 +169,35 @@ func test_roads_decode_and_paint_lists() -> void:
 	assert_eq(n, roads.count)
 	assert_gt(n, 500)
 	assert_gt(lists_total, 0)
-	# Painting a ring records every tile in it and reports what it drew.
+	# Nothing to paint under the headless display server (the rings need a renderer); the data is all there.
 	roads.build_all_around(Vector3.ZERO)
-	assert_gt(roads.painted(), 0)
+	if GeoTerrainLayer.can_draw():
+		assert_gt(roads.painted(), 0)
+	else:
+		assert_eq(roads.painted(), 0)
+
+
+func test_headless_layers_draw_nothing_but_keep_data() -> void:
+	if GeoTerrainLayer.can_draw():
+		pass_test("needs the headless display server (GUT runs headless)")
+		return
+	var t := _terrain()
+	for l in t.layers():
+		if l.has_method(&"build_all_around"):
+			l.build_all_around(Vector3.ZERO)
+	var trees: GeoTreeLayer = null
+	var blds: GeoBuildingLayer = null
+	for l in t.layers():
+		if l is GeoTreeLayer:
+			trees = l
+		elif l is GeoBuildingLayer:
+			blds = l
+		var visuals := l.find_children("*", "GeometryInstance3D", true, false)
+		assert_eq(visuals.size(), 0, "%s created render nodes headless" % l.name)
+	assert_gt(trees.tree_count, 0)
+	assert_gt(blds.buildings_drawn, 0)
+	var r := t.line_of_sight(Vector3(-800, 200, 0), Vector3(800, 200, 0))
+	assert_true(r.has("visible"))
 
 
 func test_auto_layers() -> void:

@@ -73,6 +73,11 @@ the ground by the eye or antenna height):
 | `obstacle` | what blocked: `"terrain"`, `"building"`, `"tree"`; `""` when visible |
 | `building_id` | the blocking building's index in the package, when `obstacle` is `"building"` |
 
+An end point that is NaN or infinite (typically `height_at` of a point outside the package) gives at once
+`visible: false`, `partial: true`, `distance` and `clearance` NaN and an `error` text; `raycast` with such an origin
+or a zero direction returns `hit: false` with `error`, and `viewshed` with a NaN eye or radius returns `null`. No
+engine error is pushed, since a moving unit may meet this every frame.
+
 `mask` (`GeoVisibility.TERRAIN | BUILDINGS | TREES`, default `ALL`) picks what blocks; layers the package does not
 have are ignored. Buildings are blocks: the footprint (with holes) from its base, or its `min_height` for parts
 above the ground, to the top of the walls plus half the roof (roof shapes are not modelled in queries); the test
@@ -137,6 +142,11 @@ the package frame and stream around the camera; heavy work runs on `WorkerThread
 | `GeoBuildingLayer` | `buildings.bin` | per 500 m tile: up to `max_distance` (4 km) every building, walls with windows from the shader, flat / hipped / gabled / pyramidal roofs, domes; beyond, to `far_distance` (12 km), buildings ≥ `far_min_height` (20 m) as flat blocks |
 | `GeoRoadLayer` | `roads.bin` | roads painted by Godot's 2D renderer into two textures around the camera (2 km at 1 m / px, 8 km at 4 m / px; asphalt, pavement, rail) and blended by the terrain shader; bridge decks as meshes; tunnels not drawn |
 | `GeoTreeLayer` | `landcover.png`, `canopy.png`, `footprints.png` | deterministic placement per 10 m sample (tree class: `density` trees; elsewhere one where the canopy is ≥ 3 m), none on water or buildings; 3D low-poly trees to 600 m, impostor cards to 3 km |
+
+Under the headless display server (`--headless`: tests, servers, CI) the layers create no meshes, MultiMeshes or
+ring viewports (the dummy renderer rejects them); they still load their data, count what they would draw and serve
+the visibility queries, so scenes need not switch them off. Slender structures (at least 60 m tall and over three
+times as tall as wide, such as the Çamlıca TV tower) are drawn as bare light concrete without windows.
 
 The building layer and the visibility queries share one decoder (`GeoTerrainPackage.buildings_data()`,
 `GeoBuildingData`, thread-safe).

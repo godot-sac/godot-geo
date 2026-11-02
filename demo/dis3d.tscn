@@ -38,9 +38,8 @@ exercise_id = 1
 application_id = 1
 
 [node name="DisGeoOrigin" type="DisGeoOrigin" parent="."]
-latitude = 39.9334
-longitude = 32.8597
-height = 938.0
+latitude = 41.02
+longitude = 29.05
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("env")

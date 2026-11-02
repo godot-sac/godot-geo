@@ -20,6 +20,9 @@ extends GeoTerrainLayer
 ## How far walls reach below the lowest ground point, so slopes show no gap under a building.
 @export var foundation := 2.0
 
+## Masts and towers (much taller than wide, e.g. the 369 m Çamlıca TV tower) are drawn as bare light concrete; with
+## windows they read as a dark rod from afar.
+const TOWER_COLOR := Color(0.55, 0.55, 0.53, 0.0)
 const WALL_SHADER := preload("res://addons/geo/layers/geo_building_wall.gdshader")
 const ROOF_SHADER := preload("res://addons/geo/layers/geo_building_roof.gdshader")
 ## Tile meshes are prepared on this many worker threads at a time.
@@ -82,7 +85,7 @@ func update_view(camera: Vector3) -> void:
 	if sync:
 		for key in _todo:
 			if not _tasks.has(key):
-				var arrays: Variant = _arrays(key)
+				var arrays: Variant = _arrays(key) if can_draw() else null
 				var m: ArrayMesh = null
 				if arrays != null:
 					m = ArrayMesh.new()
@@ -160,7 +163,7 @@ func _exit_tree() -> void:
 func _prepare(key: Vector3i) -> void:
 	# The mesh is created here too: RenderingServer calls are thread-safe, and uploading a large tile on the main
 	# thread cost up to 13 ms in the 60 km package.
-	var arrays: Variant = _arrays(key)
+	var arrays: Variant = _arrays(key) if can_draw() else null
 	var mesh: ArrayMesh = null
 	if arrays != null:
 		mesh = ArrayMesh.new()
@@ -184,6 +187,8 @@ func _add_tile(key: Vector3i, mesh: ArrayMesh) -> void:
 	tiles_built += 1
 	if mesh == null:
 		_tiles[key] = null
+		if key.z == 0 and not can_draw():
+			buildings_drawn += data.tile_count(key.x, key.y)  # nothing drawn headless, but the count stays meaningful
 		return
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
@@ -207,6 +212,12 @@ func _add_tile(key: Vector3i, mesh: ArrayMesh) -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	_tiles[key] = mi
+
+
+## True for a slender structure: at least 60 m tall and over three times as tall as the footprint is wide.
+static func is_tower(b: Dictionary) -> bool:
+	var size: Vector2 = b.aabb.size
+	return b.height >= 60.0 and b.height > 3.0 * maxf(size.x, size.y)
 
 
 ## Mesh of a list of buildings relative to `center` (x, z): surface 0 walls (UV = metres along the wall, metres
@@ -277,6 +288,8 @@ class _Surface:
 static func _add_building(b: Dictionary, center: Vector2, foundation: float, w: _Surface, r: _Surface,
 		simple := false) -> void:
 	var facade: Color = b.facade.srgb_to_linear()
+	if is_tower(b):
+		facade = TOWER_COLOR  # alpha 0: the wall shader draws no windows
 	var roof_col: Color = b.roof_color.srgb_to_linear()
 	var y0: float = b.base + b.min_height if b.min_height > 0.0 else b.base - foundation
 	var shape: int = b.roof

@@ -1,4 +1,5 @@
-## 3D DIS demo: one side of the godot-dis two-sided exercise around Ankara, on real terrain.
+## 3D DIS demo: one side of the godot-dis two-sided exercise around Üsküdar (Istanbul), on real terrain with its
+## buildings, trees, roads and the Bosphorus.
 ## Needs the sibling repositories linked once: python tools/link_siblings.py (see docs/demo-3d.md).
 ##   <godot> --path . res://demo/dis3d.tscn -- --side blue
 ## Other participants: the godot-dis 2D demo (--side red) and godot-dis tools/demo_traffic.py (civilian traffic).
@@ -12,7 +13,9 @@
 ## code 1 on problems), --shots dir [--warmup s] (documentation views).
 extends Node3D
 
-const PACKAGES := ["res://terrain/ankara_60km", "res://terrain/ankara", "res://tests/data/ankara_small"]
+## The exercise spans about ±14 km (aircraft) and the red land units are 4-8 km east of the origin, so the 60 km
+## package comes first; the 10 km one shows the blue side only.
+const PACKAGES := ["res://terrain/uskudar", "res://terrain/uskudar_10km", "res://tests/data/uskudar_small"]
 const SUN_ELEVATION := 24.0
 const SUN_AZIMUTH := 235.0
 const SAMPLE_INTERVAL := 0.1  # log and check rate, seconds
@@ -82,9 +85,9 @@ func _ready() -> void:
 	if not terrain.is_loaded():
 		push_error("No terrain package; build one with tools/build_terrain.py (see docs/demo-3d.md).")
 		return
-	if terrain.package.size_m < 50000.0:
-		push_warning("terrain %s covers ±%d km; the exercise spans ±27 km, units beyond it keep their reported height "
-				% [terrain.package_path, terrain.package.size_m / 2000.0] + "(build terrain/ankara_60km, see docs/demo-3d.md)")
+	if terrain.package.size_m < 30000.0:
+		push_warning("terrain %s covers ±%d km; the exercise spans ±14 km, units beyond it keep their reported height "
+				% [terrain.package_path, terrain.package.size_m / 2000.0] + "(build terrain/uskudar, see docs/demo-3d.md)")
 	camera.far = terrain.package.size_m * 3.0
 	$HUD/Attribution.text = "\n".join(terrain.attribution()) + \
 			"\nEnumerations: SISO-REF-010, reprinted with permission from SISO Inc.  Symbols: MIL-STD-2525D (approx.)"
@@ -144,6 +147,7 @@ func _spawn_units(side_info: Dictionary) -> void:
 		mover.altitude = unit.altitude
 		mover.distance = unit.start
 		mover.ground = terrain
+		mover.surface = unit.get("surface", false)  # ships: on the water surface that height_at gives
 		var entity := DisEntity.new()
 		entity.entity_id = Vector3i(0, 0, i + 1)
 		entity.force_id = side_info.force
@@ -180,7 +184,7 @@ func _build_map() -> void:
 	$HUD.add_child(panel)
 	_map = DemoTacticalMap.new()
 	_map.origin = origin
-	_map.meters_per_pixel = 140.0
+	_map.meters_per_pixel = 60.0  # the exercise: about ±10 km of Üsküdar and the Bosphorus
 	panel.add_child(_map)
 
 
@@ -480,6 +484,7 @@ func _take_shots(warmup: float) -> void:
 		["R-T1", -0.8, -0.3, 50.0, "remote_tank"],
 		["T-1", 2.0, -0.55, 6000.0, "exercise"],
 		["CAR-1", 1.2, -0.3, 40.0, "civilian"],
+		["P-1", 0.6, -0.25, 60.0, "patrol_boat"],
 		["", 0.0, -1.2, 55000.0, "overview"],
 	]
 	for s: Array in shots:
@@ -496,8 +501,8 @@ func _take_shots(warmup: float) -> void:
 		orbit_distance = s[3]
 		if s[0] == "":  # whole exercise, centred on the origin
 			free_camera = true
-			camera.global_position = Vector3(2000, 19000, 22000)
-			camera.look_at(Vector3(0, 0, -2000))
+			camera.global_position = Vector3(3000, 9000, 15000)
+			camera.look_at(Vector3(1500, 0, -1000))
 		for i in 30:
 			await get_tree().process_frame
 		get_viewport().get_texture().get_image().save_png(_shots_dir.path_join(s[4] + ".png"))

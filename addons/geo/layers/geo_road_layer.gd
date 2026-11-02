@@ -60,6 +60,8 @@ func _rebuild() -> void:
 	if not err.is_empty():
 		push_error("GeoRoadLayer: " + err)
 		return
+	if not can_draw():
+		return
 	for k in 2:
 		var vp := SubViewport.new()
 		vp.size = Vector2i(RING_PIXELS, RING_PIXELS)

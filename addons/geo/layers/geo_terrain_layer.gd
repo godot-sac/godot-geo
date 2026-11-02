@@ -31,6 +31,13 @@ func _rebuild() -> void:
 	pass
 
 
+## False under the headless display server (`--headless`, tests, servers): its dummy renderer rejects MultiMesh and
+## mesh resources ("Attempting to initialize the wrong RID", "Parameter multimesh is null"), so layers then keep
+## their data, counts and queries but create nothing to draw.
+static func can_draw() -> bool:
+	return DisplayServer.get_name() != "headless"
+
+
 ## Surface height in the package frame (NAN outside).
 func ground(x: float, z: float) -> float:
 	return terrain.surface_height_local(x, z)

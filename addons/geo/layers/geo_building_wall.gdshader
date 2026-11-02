@@ -1,6 +1,7 @@
 // Building walls of GeoBuildingLayer. UV = (metres along the wall, metres above the building base); COLOR = facade
-// colour (linear). Windows are drawn procedurally on 3 m floors and ~3.2 m bays; where a window would be smaller
-// than about two pixels the pattern fades into its average so distant facades do not shimmer.
+// colour (linear), alpha 0 for walls without windows (towers, masts). Windows are drawn procedurally on 3 m floors
+// and ~3.2 m bays; where a window would be smaller than about two pixels the pattern fades into its average so
+// distant facades do not shimmer.
 shader_type spatial;
 render_mode cull_back;
 
@@ -22,6 +23,7 @@ void fragment() {
 	float win = box(f, vec2(0.25, 0.3), vec2(0.75, 0.77), aa * 1.5) * step(0.6, uv.y);
 	float detail = 1.0 - smoothstep(0.25, 0.6, max(aa.x, aa.y));
 	win = mix(0.36 * 0.5 * step(0.6, uv.y), win, detail);
+	win *= COLOR.a; // alpha 0 = no windows (towers and masts)
 	// Slight floor-to-floor and bay-to-bay variation of the plaster; a darker plinth.
 	float row = floor(uv.y / floor_height);
 	float vary = 0.94 + 0.06 * fract(sin(row * 12.9898 + floor(uv.x / bay_width) * 4.1414) * 43758.5453);
