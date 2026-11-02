@@ -9,10 +9,25 @@ All notable changes to this project are documented here. Versions follow [semver
   anti-aliased coverage mask; `--overture-release` pins the release. `GeoTerrain.water` draws it as water (wave
   normals that fade before they alias, low roughness, shallow tint near the shore) on the terrain surface itself,
   which is at the DEM's sea level there; `GeoTerrain.water_at()`, `GeoTerrainPackage.water_at()`.
+- Land cover (`--layers landcover`, ESA WorldCover) and canopy (`canopy`, ETH Global Canopy Height) layers; the
+  terrain shader modulates the imagery with per-class detail textures and normals near the camera (own procedural
+  textures, `tools/make_detail_textures.py`).
+- Buildings (`--layers buildings`, `tools/buildings.py`): Overture / OpenStreetMap footprints and building parts,
+  heights from tags, levels or GHSL GHS-BUILT-H, roof shapes, colours; military areas and underground features left
+  out; an approximate bare-earth ground model replaces the DEM under them (`height.surface = "dtm-approx"`).
+  `GeoBuildingLayer` draws them per 500 m tile (full detail to 4 km, tall buildings as blocks to 12 km).
+- Roads (`--layers roads`, `tools/roads.py`): Overture transportation segments with bridge / tunnel flags and bridge
+  deck heights; `GeoRoadLayer` paints them into ring textures around the camera and draws bridge decks.
+- Trees: `GeoTreeLayer`, deterministic placement from land cover and canopy height, 3D trees near, impostors far.
+- `GeoTerrainLayer` children added by `GeoTerrain.auto_layers`; layer work on `WorkerThreadPool` tasks.
+- Visibility queries take a `mask` (`GeoVisibility.TERRAIN | BUILDINGS | TREES`): buildings (exact on footprints)
+  and tree crowns block lines of sight, ray casts and viewsheds; results name the `obstacle` and `building_id`.
 - Demo `demo/city.tscn`: camera bookmarks from `demo/places.json` (Üsküdar, Istanbul), `--place`, `--tour --out`
-  (one picture per bookmark + frame times), `demo/places_sheet.py` contact sheet. The visibility demo prefers
-  `terrain/uskudar_10km`.
-- Test package `tests/data/uskudar_small` (3 km, Üsküdar seafront, with water layer; ODbL for `water.png`).
+  (one picture per bookmark + frame times), `--check` (layers, counts, frame times, known lines of sight, exit code),
+  `--bench` (fixed route at 150 m and 500 m, frame time percentiles); `demo/places_sheet.py` contact sheet. The
+  visibility demo prefers `terrain/uskudar_10km`.
+- Test package `tests/data/uskudar_small` (3 km, Üsküdar seafront, with all layers; ODbL for the OpenStreetMap
+  derived files).
 - `tools/build_terrain.py`: builds a terrain package (height EXR, Sentinel-2 colour PNG, `terrain.json`) on the local
   ENU grid at an origin, with EGM2008 geoid and Earth curvature; tests against GDAL, PROJ and godot-dis golden data.
 - `GeoTerrain` node: loads a package, draws it with a CDLOD renderer (geomorphing, per-node culling), `height_at`,

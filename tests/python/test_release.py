@@ -27,11 +27,13 @@ def test_sample_terrain_zip(tmp_path):
     names = set(archive.namelist())
     assert "terrain/.gdignore" in names
     for n in release.SAMPLES:
-        assert {f"terrain/{n}/{f}" for f in release.PACKAGE_FILES + ["ATTRIBUTION.txt"]} <= names
         meta = json.loads(archive.read(f"terrain/{n}/terrain.json"))
+        assert {f"terrain/{n}/{f}" for f in release.package_files(meta) + ["ATTRIBUTION.txt"]} <= names
         text = archive.read(f"terrain/{n}/ATTRIBUTION.txt").decode("utf-8")
         for notice in meta["attribution"]:
             assert notice in text
+        if "buildings" in meta:
+            assert "Open Database License" in text and "buildings.bin" in text
     assert not [n for n in names if n.endswith(".import")]
 
 
@@ -39,7 +41,7 @@ def test_package_with_wrong_hash_is_refused(tmp_path):
     src = ROOT / "tests" / "data" / "ankara_small"
     copy = tmp_path / "pkg"
     copy.mkdir()
-    for f in release.PACKAGE_FILES:
+    for f in ["terrain.json", "height.exr", "color.png"]:
         (copy / f).write_bytes((src / f).read_bytes())
     (copy / "color.png").write_bytes(b"not the original")
     with pytest.raises(ValueError, match="SHA-256"):

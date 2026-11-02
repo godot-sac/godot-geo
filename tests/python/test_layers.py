@@ -111,6 +111,38 @@ def test_open_water_is_at_mean_sea_level(package):
     assert g["n_min_m"] - 0.05 < h.min() and h.max() < g["n_max_m"] + 0.05
 
 
+def test_landcover_matches_worldcover_cache(package):
+    """landcover.png equals ESA WorldCover at the sample positions (positions through PROJ, not pymap3d)."""
+    meta = package[0]
+    if "landcover" not in meta:
+        pytest.skip("no land cover layer")
+    cached = sorted((bt.CACHE / "rasters").glob("worldcover_N39E027-*.npz"))
+    if not cached:
+        pytest.skip("no WorldCover window in tools/.cache")
+    import pyproj
+    lc = np.asarray(Image.open(PACKAGE / meta["landcover"]["file"]))
+    n, sp = lc.shape[0], meta["landcover"]["spacing_m"]
+    o = meta["origin"]
+    enu = pyproj.Transformer.from_pipeline(
+        f"+proj=pipeline +step +inv +proj=topocentric +ellps=WGS84 +lon_0={o['longitude']} +lat_0={o['latitude']} "
+        f"+h_0={o['height']} +step +inv +proj=cart +ellps=WGS84 +step +proj=unitconvert +xy_in=rad +xy_out=deg")
+    rng = np.random.default_rng(5)
+    rows, cols = rng.integers(0, n, 300), rng.integers(0, n, 300)
+    lon, lat, _ = enu.transform(-meta["size_m"] / 2 + cols * sp, meta["size_m"] / 2 - rows * sp, np.zeros(300))
+    for path in cached:
+        z = np.load(path)
+        a, _, c, _, e, f = z["transform"]
+        r = np.floor((lat - f) / e).astype(int)
+        q = np.floor((lon - c) / a).astype(int)
+        ok = (r >= 0) & (r < z["data"].shape[0]) & (q >= 0) & (q < z["data"].shape[1])
+        if ok.all():
+            same = z["data"][r, q] == lc[rows, cols]
+            # Points within millimetres of a WorldCover pixel edge may round the other way.
+            assert same.mean() > 0.99
+            return
+    pytest.skip("cached window does not cover the package")
+
+
 def test_land_is_not_water(package):
     meta, height, water = package
     k = int(round(meta["height"]["spacing_m"] / meta["water"]["spacing_m"]))

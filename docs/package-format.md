@@ -9,6 +9,11 @@ A package is a directory written by `tools/build_terrain.py` and read by Godot w
 | `color.png` | RGB8, sRGB, Sentinel-2 L2A true colour. |
 | `terrain.json` | Metadata, below. |
 | `water.png` | Optional (`--layers water`): L8, share of each cell covered by water, 255 = all water. |
+| `landcover.png` | Optional (`landcover`): L8, ESA WorldCover 2021 class value (10 tree, 20 shrub, 30 grass, 40 crop, 50 built-up, 60 bare, 70 snow, 80 water, 90 wetland, 95 mangrove, 100 moss), 0 = no data. |
+| `canopy.png` | Optional (`canopy`): L8, tree canopy height in quarter metres (ETH Global Canopy Height 2020). |
+| `buildings.bin` | Optional (`buildings`): building footprints, heights, roofs, colours (format in `tools/buildings.py`). |
+| `footprints.png` | With `buildings`: L8 on the height grid, 255 where a footprint touches the sample's cell. |
+| `roads.bin` | Optional (`roads`): road and rail polylines with class, width, bridge / tunnel flags and deck heights (format in `tools/roads.py`). |
 
 ## Grid and frame
 Both rasters are square grids centred on the origin, `size_m` wide, sampled at their own `spacing_m`
@@ -68,11 +73,22 @@ Optional layers have their own key, file and grid (same frame, centred on the or
                        "rows_sha256": "..."},
             "license": "ODbL-1.0 (derived from OpenStreetMap)", "water_share": 0.208, "sha256": "..."}
 ```
+`landcover`, `canopy` and `footprints` have the same keys (file, encoding, samples, spacing_m, source, license,
+sha256). `buildings` and `roads` describe their binary files: `tile_m` (500), `tiles`, `count`, sources, licence,
+and for buildings `height_sources` (shares of tag / floors / GHSL / default) and `dropped` (features left out:
+military areas, underground, outside). With buildings, `height.surface` is `"dtm-approx"` and `height.ground_model`
+describes the bare-earth approximation; otherwise `height.surface` is `"dsm"` (older packages have no key: DSM).
+Both binary files are little-endian: a header (magic `GGBL` / `GGRD`, version 1, tile size, tile counts, feature
+count), an index of zlib blocks per tile, then the blocks; coordinates are 16-bit integers in 5 cm units from the
+tile centre (Godot axes: x east, z south). The Godot readers are `GeoBuildingData` and `GeoRoadLayer`.
 A cell is the `spacing_m` square centred on its sample; the value is the covered share computed with 4 × 4
 supersampling, so sampling it bilinearly and cutting at 0.5 gives the shoreline to a fraction of a cell. Water
 polygons are Overture `base/water` subtypes ocean, lake, pond, reservoir, river, water, canal and stream (swimming
 pools and named sea areas are left out). The file is derived from OpenStreetMap and licensed under ODbL 1.0; the
-package's `attribution` then includes "© OpenStreetMap contributors, Overture Maps Foundation".
+package's `attribution` then includes "© OpenStreetMap contributors, Overture Maps Foundation". The same holds for
+`buildings.bin`, `footprints.png` and `roads.bin` (OpenStreetMap, and Microsoft ML footprints through Overture, in
+one building layer). `landcover.png` and `canopy.png` are CC BY 4.0 (ESA WorldCover; ETH Global Canopy Height),
+and buildings add the GHSL notice (CC BY 4.0) for their height estimates.
 
 Readers must check `format` and `format_version`; additions within version 1 are new keys only.
 Anything that shows the terrain (a game, a screenshot, a video) must show the `attribution` lines.

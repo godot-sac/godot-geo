@@ -2,7 +2,7 @@
   "format": "godot-geo-terrain",
   "format_version": 1,
   "generator": "godot-geo tools/build_terrain.py 0.1.0",
-  "created": "2026-11-02T17:21:38+00:00",
+  "created": "2026-11-02T18:07:37+00:00",
   "origin": {
     "latitude": 41.024,
     "longitude": 29.012,
@@ -209,5 +209,24 @@
     "spacing_m": 15.0,
     "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)",
     "sha256": "786c4b7ef43f41d645a145d02e6a35eff7ba790b7fe0782da4b4b8be8c63e9fe"
+  },
+  "roads": {
+    "file": "roads.bin",
+    "encoding": "godot-geo roads v1 (see tools/roads.py): zlib tiles of polylines with class, flags, width and bridge deck heights; package frame",
+    "tile_m": 500.0,
+    "tiles": {
+      "x": 6,
+      "z": 6,
+      "non_empty": 24
+    },
+    "count": 1847,
+    "bridges": 4,
+    "source": {
+      "product": "Overture Maps transportation segments (OpenStreetMap)",
+      "release": "2026-10-21.0",
+      "access": "s3://overturemaps-us-west-2/release/2026-10-21.0/theme=transportation"
+    },
+    "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)",
+    "sha256": "13ac25cdb7e74bf06fc6ffe62cfa8d2f3fbf10f78ab4131b06536b02321eecc2"
   }
 }

@@ -17,7 +17,8 @@ GeoTerrain                 loading, queries, collision, alignment with DisGeoOri
 | `lod_distance` | 4.0 | level 0 range in patch sizes (64 cells); higher = sharper and slower, minimum 3.5 |
 | `cast_shadows` | true | |
 | `water` | true | draw the package's water layer (if any) as water; the water surface is the terrain itself, see [Water](#water) |
-| `ground_detail` | 0 | procedural detail on the ground near the camera (0–1); not data, it only breaks up the blur of 10 m imagery seen from a few metres. The demos use 0.6 |
+| `ground_detail` | 0 | strength of the ground detail near the camera (0–1): with a land cover layer, per-class detail textures; without one, procedural noise. Not data: it only breaks up the blur of 10 m imagery seen from a few metres. The demos use 0.6 |
+| `auto_layers` | true | add the [layers](#layers) the package has data for (buildings, roads, trees) unless a child of that type exists |
 | `collision_enabled` | true | |
 | `collision_size` | 2000 | edge of the square collision patch, metres; it follows the target |
 | `collision_target` | — | node the patch follows; the active camera if empty |
@@ -31,13 +32,15 @@ GeoTerrain                 loading, queries, collision, alignment with DisGeoOri
 | `height_at(x, z) -> float` | global surface height; `NAN` outside the package |
 | `geodetic_height(lat, lon) -> float` | WGS84 ellipsoidal height of the ground; `NAN` outside |
 | `geodetic_to_global(lat, lon, h) -> Vector3` / `global_to_geodetic(p)` | positions in the terrain's frame |
-| `raycast(from, direction, max_distance) -> Dictionary` | first hit on the surface: `hit`, `position`, `distance`, `normal` |
-| `line_of_sight(a, b, refraction) -> Dictionary` | see [Visibility queries](#visibility-queries) |
-| `viewshed(observer, radius, target_height, resolution, refraction) -> Image` | visible / hidden ground around an eye position |
+| `raycast(from, direction, max_distance, mask) -> Dictionary` | first hit: `hit`, `position`, `distance`, `normal`, `obstacle` (`building_id` for buildings) |
+| `line_of_sight(a, b, refraction, mask) -> Dictionary` | see [Visibility queries](#visibility-queries) |
+| `viewshed(observer, radius, target_height, resolution, refraction, mask) -> Image` | visible / hidden ground around an eye position |
 | `viewshed_rect(observer, radius) -> Rect2` | global x / z square covered by `viewshed` |
 | `set_overlay(image, rect)` / `clear_overlay()` | RGBA image blended over the terrain colour in a global x / z rectangle |
 | `to_package_local(p)` / `from_package_local(p)` | global position <-> package frame (for `GeoVisibility` on a thread) |
 | `water_at(x, z) -> float` | share of the ground that is water there (0..1, from the water layer), 0 without one, `NAN` outside |
+| `surface_height_local(x, z) -> float` | surface height in the package frame (for layers and threads) |
+| `layers() -> Array[GeoTerrainLayer]` | the layer children |
 | `attribution() -> PackedStringArray` | data notices to show with the terrain |
 | `is_loaded()`, signal `loaded` | |
 
@@ -67,6 +70,18 @@ the ground by the eye or antenna height):
 | `clearance` | the segment's lowest height above the surface, metres; negative when blocked (depth) |
 | `clearance_point` | where that is |
 | `partial` | part of the segment is outside the package and was not tested |
+| `obstacle` | what blocked: `"terrain"`, `"building"`, `"tree"`; `""` when visible |
+| `building_id` | the blocking building's index in the package, when `obstacle` is `"building"` |
+
+`mask` (`GeoVisibility.TERRAIN | BUILDINGS | TREES`, default `ALL`) picks what blocks; layers the package does not
+have are ignored. Buildings are blocks: the footprint (with holes) from its base, or its `min_height` for parts
+above the ground, to the top of the walls plus half the roof (roof shapes are not modelled in queries); the test
+is exact on the footprint polygons (a 25 m grid per 500 m tile finds the candidates). Tree crowns are solid from
+the ground to the canopy height of their 10 m sample wherever the tree layer puts trees, sampled every 5 m along
+the segment. `clearance` is measured against the terrain only. In the viewshed, buildings and crowns raise the
+surface of the pixels whose centre they cover (the target then sits on the roof).
+Cost in the 10 km Üsküdar package (GDScript, RTX 4080 machine): 3 km at street level 1 ms, 5 km from a tower 11 ms
+(most of it the crown samples), 1.9 km over the Bosphorus 2 ms.
 
 The walk is exact for the triangulated surface: between consecutive crossings of grid lines and cell diagonals
 (`x`, `z` or `x + z` on a grid line) both the segment and the surface are planar, so the clearance is linear there
@@ -109,6 +124,38 @@ coverage with a one-pixel ramp (sharp at any distance), a sum of six travelling 
 camera (each wave fades out before it gets shorter than a few pixels, so the far sea does not show stripes),
 roughness rises with distance, a shallow tint follows the shore, and far away the water takes the imagery's tone.
 No bathymetry: the sea floor is not modelled.
+
+## Layers
+Children of `GeoTerrain` derived from `GeoTerrainLayer` draw what the package's optional layers describe (see
+[package format](package-format.md) and `tools/layers.py`, `tools/buildings.py`, `tools/roads.py`). With
+`auto_layers` they are added when the package has the data; add one yourself to change its settings. They work in
+the package frame and stream around the camera; heavy work runs on `WorkerThreadPool` tasks.
+
+| Layer | Data | Drawing |
+|---|---|---|
+| ground detail (CDLOD shader) | `landcover.png` (ESA WorldCover) | per class a detail texture and normal (own procedural set, 8 slices, `tools/make_detail_textures.py`) modulates the imagery out to 1.5 km; in built-up areas with 3D buildings the imagery (mostly roofs) is pulled towards street tones out to 4 km |
+| `GeoBuildingLayer` | `buildings.bin` | per 500 m tile: up to `max_distance` (4 km) every building, walls with windows from the shader, flat / hipped / gabled / pyramidal roofs, domes; beyond, to `far_distance` (12 km), buildings ≥ `far_min_height` (20 m) as flat blocks |
+| `GeoRoadLayer` | `roads.bin` | roads painted by Godot's 2D renderer into two textures around the camera (2 km at 1 m / px, 8 km at 4 m / px; asphalt, pavement, rail) and blended by the terrain shader; bridge decks as meshes; tunnels not drawn |
+| `GeoTreeLayer` | `landcover.png`, `canopy.png`, `footprints.png` | deterministic placement per 10 m sample (tree class: `density` trees; elsewhere one where the canopy is ≥ 3 m), none on water or buildings; 3D low-poly trees to 600 m, impostor cards to 3 km |
+
+The building layer and the visibility queries share one decoder (`GeoTerrainPackage.buildings_data()`,
+`GeoBuildingData`, thread-safe).
+
+**Ground under buildings.** Copernicus DEM is a surface model; a package with buildings stores an approximate
+bare earth instead (`height.surface = "dtm-approx"`): under building footprints the DEM is filled in from the
+surrounding samples (never from water), under trees it is lowered by half the canopy height, and the lowering is
+capped at 8 m (or half the canopy) so built-over hilltops stay. Buildings stand on the lowest ground under their
+footprint and reach 2 m below it.
+
+**Heights.** OpenStreetMap `height`, else `building:levels` × 3 m, else the GHSL GHS-BUILT-H average net building
+height of the 100 m cell varied per building, else 3–6 floors. In the 10 km Üsküdar package 0.3 % come from a
+height tag, 3.8 % from levels and 95.8 % from GHSL (Microsoft's ML footprints have no heights for Türkiye).
+
+**Measurements** (10 km Üsküdar package, 1920 × 1080, RTX 4080, Windows, `demo/city.tscn -- --bench`): a fixed
+route at 150 m and 500 m above the ground with all layers streaming: median frame 2.0 ms, p95 2.9–3.3 ms, p99
+7.1–7.6 ms; 5–6 frames per run over 33 ms (40–70 ms, one per 2 km of flight, when the far road ring moves; the first
+frame after a jump 50 ms); 0.8–0.9 k draw calls, 5.9–8.4 M primitives, 552 MB video memory. Around the reference
+views 30–62 k buildings, 100–150 k trees and 3.6–8.8 k road pieces are drawn.
 
 ## Alignment with godot-dis
 If the scene has a node in group `dis_geo_origin` (godot-dis `DisGeoOrigin`) — godot-geo does not depend on
@@ -168,5 +215,8 @@ nodes ([stats](phase2/stats.json), [views](phase2/views_sheet.jpg)).
   sensors per frame.
 - Packages are read from the file system (`res://` in the editor, absolute paths); exported games need the package
   next to the executable. One package at a time, no streaming.
-- Close to the ground the picture is limited by the data (30 m DEM, 10 m imagery), not by the renderer; a detail
-  texture from ESA WorldCover is planned for v0.2.
+- Close to the ground the picture is limited by the data (30 m DEM, 10 m imagery); the land cover detail textures
+  and the 3D layers hide it at the scale of a street, not of a doorway.
+- Building heights are mostly estimates (see [Layers](#layers)); roof shapes are guessed for untagged buildings.
+  Bridge decks follow the ground at the bridge ends: the Bosphorus bridges sit 10–20 m lower than reality and have
+  no towers or cables.

@@ -146,10 +146,39 @@ func test_tree_placement_is_deterministic() -> void:
 				assert_lt(pkg.water_at(p.x, p.z), 0.31)
 
 
+func test_roads_decode_and_paint_lists() -> void:
+	var t := _terrain()
+	var roads: GeoRoadLayer = null
+	for l in t.layers():
+		if l is GeoRoadLayer:
+			roads = l
+	assert_not_null(roads, "auto layer")
+	var n := 0
+	var lists_total := 0
+	for j in roads.tiles_z:
+		for i in roads.tiles_x:
+			var list := roads.tile(i, j)
+			n += list.size()
+			for r: Array in list:
+				assert_gte((r[3] as PackedVector2Array).size(), 2)
+				assert_gt(r[2], 0.0)
+				if r[1] & GeoRoadLayer.Flag.BRIDGE:
+					assert_eq((r[4] as PackedFloat32Array).size(), (r[3] as PackedVector2Array).size())
+			for l: Array in roads.draw_lists(i, j):
+				lists_total += l.size()
+	assert_eq(n, roads.count)
+	assert_gt(n, 500)
+	assert_gt(lists_total, 0)
+	# Painting a ring records every tile in it and reports what it drew.
+	roads.build_all_around(Vector3.ZERO)
+	assert_gt(roads.painted(), 0)
+
+
 func test_auto_layers() -> void:
 	var t := _terrain()
 	var kinds := t.layers().map(func(l: GeoTerrainLayer) -> String: return l.get_script().get_global_name())
 	assert_has(kinds, "GeoBuildingLayer")
+	assert_has(kinds, "GeoRoadLayer")
 	assert_has(kinds, "GeoTreeLayer")
 	var b := GeoTerrain.new()
 	b.auto_layers = false

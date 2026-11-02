@@ -1,6 +1,7 @@
 # Runs the Godot (GUT) tests on Windows and Linux and the package builder tests (pytest) on Linux, then packs the
 # release zips (tools/package_release.py) and installs them into an empty project (tools/check_package.py).
-# On a v* tag it also builds the Ankara 40 km terrain package and attaches everything to a draft GitHub release.
+# On a v* tag it also builds the Ankara 40 km and the Üsküdar 10 km / 60 km terrain packages and attaches everything
+# to a draft GitHub release.
 name: CI
 
 on:

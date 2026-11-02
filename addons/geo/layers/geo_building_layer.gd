@@ -4,13 +4,17 @@
 ## the package), hipped, gabled and pyramidal on four-corner footprints, domes and onion domes as half spheres.
 ## Facades get windows from a shader (3 m floors); colours come from the package (tags, else a palette).
 ##
-## One mesh per package tile (500 m), built nearest first within `build_budget_ms` per frame and shown up to
-## `max_distance` (Godot visibility ranges with a dither fade); tiles farther away are freed. Buildings are also
-## obstacles for GeoTerrain.line_of_sight / raycast / viewshed (see GeoBuildingData.segment_hit).
+## Two levels of detail per package tile (500 m): up to `max_distance` every building with its roof shape and
+## windows, casting shadows; beyond it, up to `far_distance`, only buildings at least `far_min_height` tall as flat
+## blocks without shadows (the skyline). Godot visibility ranges fade one into the other. Tile meshes are prepared on
+## worker threads, nearest first, and added within `build_budget_ms` per frame; tiles out of range are freed.
+## Buildings are also obstacles for GeoTerrain.line_of_sight / raycast / viewshed (GeoBuildingData.segment_hit).
 class_name GeoBuildingLayer
 extends GeoTerrainLayer
 
 @export var max_distance := 4000.0
+@export var far_distance := 12000.0
+@export var far_min_height := 20.0
 @export var cast_shadows := true
 @export var build_budget_ms := 6.0
 ## How far walls reach below the lowest ground point, so slopes show no gap under a building.
@@ -18,17 +22,18 @@ extends GeoTerrainLayer
 
 const WALL_SHADER := preload("res://addons/geo/layers/geo_building_wall.gdshader")
 const ROOF_SHADER := preload("res://addons/geo/layers/geo_building_roof.gdshader")
+## Tile meshes are prepared on this many worker threads at a time.
+const MAX_TASKS := 4
 
 var data: GeoBuildingData
+## Buildings in the near (full detail) tiles currently built.
 var buildings_drawn := 0
 var tiles_built := 0
 
-var _tiles := {}  # Vector2i -> MeshInstance3D (null for empty tiles)
-var _tasks := {}  # Vector2i -> WorkerThreadPool task building that tile's arrays
-var _results := {}  # Vector2i -> arrays from a finished task (filled on the worker, read on the main thread)
+var _tiles := {}  # Vector3i(i, j, lod) -> MeshInstance3D (null when the tile has nothing at that level)
+var _tasks := {}  # Vector3i -> WorkerThreadPool task preparing the arrays
+var _results := {}  # Vector3i -> arrays from a finished task (filled on the worker, read on the main thread)
 var _lock := Mutex.new()
-## Tile meshes are prepared on this many worker threads at a time.
-const MAX_TASKS := 4
 var _wall_mat: ShaderMaterial
 var _roof_mat: ShaderMaterial
 
@@ -38,10 +43,7 @@ func has_data() -> bool:
 
 
 func _rebuild() -> void:
-	for id: int in _tasks.values():
-		WorkerThreadPool.wait_for_task_completion(id)
-	_tasks.clear()
-	_results.clear()
+	_wait_tasks()
 	for mi in _tiles.values():
 		if mi:
 			mi.queue_free()
@@ -60,37 +62,44 @@ func _rebuild() -> void:
 	_roof_mat.shader = ROOF_SHADER
 
 
+func _range(lod: int) -> float:
+	return (max_distance if lod == 0 else far_distance) + data.tile_m
+
+
 func update_view(camera: Vector3) -> void:
 	if data == null:
 		return
 	var cam := Vector2(camera.x, camera.z)
-	var reach := max_distance + data.tile_m
-	for key: Vector2i in _tiles.keys():
-		if data.tile_center(key.x, key.y).distance_to(cam) > reach + data.tile_m:
+	for key: Vector3i in _tiles.keys():
+		if data.tile_center(key.x, key.y).distance_to(cam) > _range(key.z) + data.tile_m:
 			var mi: MeshInstance3D = _tiles[key]
 			if mi:
-				buildings_drawn -= mi.get_meta(&"count", 0)
+				if key.z == 0:
+					buildings_drawn -= mi.get_meta(&"count", 0)
 				mi.queue_free()
 			_tiles.erase(key)
-	var todo: Array[Vector2i] = []
-	var r := ceili(reach / data.tile_m)
+	var todo: Array[Vector3i] = []
 	var c := data.tile_of(cam.x, cam.y)
-	for j in range(c.y - r, c.y + r + 1):
-		for i in range(c.x - r, c.x + r + 1):
-			var key := Vector2i(i, j)
-			if not _tiles.has(key) and data.tile_count(i, j) > 0 \
-					and data.tile_center(i, j).distance_to(cam) < reach:
-				todo.append(key)
-	todo.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		return data.tile_center(a.x, a.y).distance_squared_to(cam) < data.tile_center(b.x, b.y).distance_squared_to(cam))
+	for lod in 2:
+		var reach := _range(lod)
+		var r := ceili(reach / data.tile_m)
+		for j in range(c.y - r, c.y + r + 1):
+			for i in range(c.x - r, c.x + r + 1):
+				var key := Vector3i(i, j, lod)
+				if not _tiles.has(key) and data.tile_count(i, j) > 0 \
+						and data.tile_center(i, j).distance_to(cam) < reach:
+					todo.append(key)
+	# Nearest first; the near level before the far one at equal distance.
+	todo.sort_custom(func(a: Vector3i, b: Vector3i) -> bool:
+		return data.tile_center(a.x, a.y).distance_squared_to(cam) + a.z * 1.0e6 \
+				< data.tile_center(b.x, b.y).distance_squared_to(cam) + b.z * 1.0e6)
 	if build_budget_ms == INF:  # synchronous (build_all_around)
 		for key in todo:
 			if not _tasks.has(key):
-				_add_tile(key, tile_arrays(data.tile(key.x, key.y), data.tile_center(key.x, key.y), foundation))
+				_add_tile(key, _arrays(key))
 		return
-	# Finished tasks: create the meshes here (main thread) within the frame budget.
 	var t0 := Time.get_ticks_usec()
-	for key: Vector2i in _tasks.keys():
+	for key: Vector3i in _tasks.keys():
 		if not WorkerThreadPool.is_task_completed(_tasks[key]):
 			continue
 		WorkerThreadPool.wait_for_task_completion(_tasks[key])
@@ -99,7 +108,7 @@ func update_view(camera: Vector3) -> void:
 		var arrays: Variant = _results.get(key)
 		_results.erase(key)
 		_lock.unlock()
-		if data.tile_center(key.x, key.y).distance_to(cam) < reach + data.tile_m:
+		if data.tile_center(key.x, key.y).distance_to(cam) < _range(key.z) + data.tile_m:
 			_add_tile(key, arrays)
 		if (Time.get_ticks_usec() - t0) / 1000.0 > build_budget_ms:
 			break
@@ -110,14 +119,26 @@ func update_view(camera: Vector3) -> void:
 			_tasks[key] = WorkerThreadPool.add_task(_prepare.bind(key))
 
 
-func _exit_tree() -> void:
+func _arrays(key: Vector3i) -> Variant:
+	var list := data.tile(key.x, key.y)
+	if key.z == 1:
+		list = list.filter(func(b: Dictionary) -> bool: return b.height >= far_min_height)
+	return tile_arrays(list, data.tile_center(key.x, key.y), foundation, key.z == 1)
+
+
+func _wait_tasks() -> void:
 	for id: int in _tasks.values():
 		WorkerThreadPool.wait_for_task_completion(id)
 	_tasks.clear()
+	_results.clear()
 
 
-func _prepare(key: Vector2i) -> void:
-	var arrays := tile_arrays(data.tile(key.x, key.y), data.tile_center(key.x, key.y), foundation)
+func _exit_tree() -> void:
+	_wait_tasks()
+
+
+func _prepare(key: Vector3i) -> void:
+	var arrays: Variant = _arrays(key)
 	_lock.lock()
 	_results[key] = arrays
 	_lock.unlock()
@@ -131,8 +152,7 @@ func build_all_around(camera: Vector3) -> void:
 	build_budget_ms = budget
 
 
-func _add_tile(key: Vector2i, arrays: Variant) -> void:
-	var list := data.tile(key.x, key.y)
+func _add_tile(key: Vector3i, arrays: Variant) -> void:
 	var center := data.tile_center(key.x, key.y)
 	tiles_built += 1
 	if arrays == null:
@@ -146,21 +166,29 @@ func _add_tile(key: Vector2i, arrays: Variant) -> void:
 	mi.set_surface_override_material(0, _wall_mat)
 	mi.set_surface_override_material(1, _roof_mat)
 	mi.position = Vector3(center.x, 0.0, center.y)
-	mi.visibility_range_end = max_distance
-	mi.visibility_range_end_margin = max_distance * 0.1
 	mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast_shadows \
-			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mi.set_meta(&"count", list.size())
+	if key.z == 0:
+		mi.visibility_range_end = max_distance
+		mi.visibility_range_end_margin = max_distance * 0.1
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast_shadows \
+				else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var n := data.tile_count(key.x, key.y)
+		mi.set_meta(&"count", n)
+		buildings_drawn += n
+	else:
+		mi.visibility_range_begin = max_distance
+		mi.visibility_range_begin_margin = max_distance * 0.1
+		mi.visibility_range_end = far_distance
+		mi.visibility_range_end_margin = far_distance * 0.05
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	_tiles[key] = mi
-	buildings_drawn += list.size()
 
 
 ## Mesh of a list of buildings relative to `center` (x, z): surface 0 walls (UV = metres along the wall, metres
 ## above the base; colour = facade), surface 1 roofs (colour = roof). Null if there is nothing to draw.
-static func tile_mesh(list: Array, center: Vector2, foundation := 2.0) -> ArrayMesh:
-	var arrays: Variant = tile_arrays(list, center, foundation)
+static func tile_mesh(list: Array, center: Vector2, foundation := 2.0, simple := false) -> ArrayMesh:
+	var arrays: Variant = tile_arrays(list, center, foundation, simple)
 	if arrays == null:
 		return null
 	var mesh := ArrayMesh.new()
@@ -169,12 +197,13 @@ static func tile_mesh(list: Array, center: Vector2, foundation := 2.0) -> ArrayM
 	return mesh
 
 
-## The surface arrays of tile_mesh (walls, roofs), or null; pure, so it runs on worker threads.
-static func tile_arrays(list: Array, center: Vector2, foundation := 2.0) -> Variant:
+## The surface arrays of tile_mesh (walls, roofs), or null; pure, so it runs on worker threads. `simple`: flat
+## roofs only (the far level).
+static func tile_arrays(list: Array, center: Vector2, foundation := 2.0, simple := false) -> Variant:
 	var w := _Surface.new()
 	var r := _Surface.new()
 	for b: Dictionary in list:
-		_add_building(b, center, foundation, w, r)
+		_add_building(b, center, foundation, w, r, simple)
 	if w.verts.is_empty() and r.verts.is_empty():
 		return null
 	var out := []
@@ -221,7 +250,8 @@ class _Surface:
 		add(c, nn, uc, col)
 
 
-static func _add_building(b: Dictionary, center: Vector2, foundation: float, w: _Surface, r: _Surface) -> void:
+static func _add_building(b: Dictionary, center: Vector2, foundation: float, w: _Surface, r: _Surface,
+		simple := false) -> void:
 	var facade: Color = b.facade.srgb_to_linear()
 	var roof_col: Color = b.roof_color.srgb_to_linear()
 	var y0: float = b.base + b.min_height if b.min_height > 0.0 else b.base - foundation
@@ -229,8 +259,8 @@ static func _add_building(b: Dictionary, center: Vector2, foundation: float, w: 
 	var rings: Array = b.rings
 	var outline: PackedVector2Array = rings[0]
 	var pitched := shape in [GeoBuildingData.Roof.GABLED, GeoBuildingData.Roof.HIPPED,
-			GeoBuildingData.Roof.PYRAMIDAL] and outline.size() == 4 and rings.size() == 1
-	var dome := shape in [GeoBuildingData.Roof.DOME, GeoBuildingData.Roof.ONION]
+			GeoBuildingData.Roof.PYRAMIDAL] and outline.size() == 4 and rings.size() == 1 and not simple
+	var dome := shape in [GeoBuildingData.Roof.DOME, GeoBuildingData.Roof.ONION] and not simple
 	var roof_h: float = b.roof_height if (pitched or dome) else 0.0
 	var y1: float = b.base + b.height - roof_h
 	# Walls of every ring; u runs along the ring so windows line up around corners.
