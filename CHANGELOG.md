@@ -29,7 +29,7 @@ All notable changes to this project are documented here. Versions follow [semver
 - Demo `demo/visibility.tscn`: line of sight under the mouse, viewshed overlay, `--check` report; positions as MGRS.
 - `GeoMath`: UTM (Krüger series, Norway / Svalbard zones) and MGRS conversions, tested against PROJ and the `mgrs`
   package (golden file).
-- Release assets: `tools/package_release.py` packs the addon zip (`addons/geo/` with licence files), prebuilt
+- Release assets: `tools/package_release.py` packs the addon zip (`addons/geo/` with licence files and `VERSION.txt`), prebuilt
   terrain packages (Ankara 40 km with a pinned Sentinel-2 scene; Ankara, Fiji and Norway test packages) with
   `ATTRIBUTION.txt` and `.gdignore`, and `SHA256SUMS.txt`; `tools/check_package.py` installs them into an empty
   project and runs the queries. CI runs the check and attaches the assets to a draft release on `v*` tags.

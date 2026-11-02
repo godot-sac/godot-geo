@@ -1,7 +1,7 @@
 """Builds the release assets: the addon zip and prebuilt terrain packages, with checksums.
 
 Assets (in --out, default build/release; nothing here goes into git):
-    godot-geo-<version>.zip               addons/geo/ with LICENSE and THIRD_PARTY_NOTICES.md (Asset Library layout)
+    godot-geo-<version>.zip               addons/geo/ with LICENSE, THIRD_PARTY_NOTICES.md and VERSION.txt
     godot-geo-terrain-ankara-40km.zip     terrain/ankara/: 40 x 40 km around Ankara at 10 m (Copernicus DEM,
                                           Sentinel-2 scene pinned below, so a rebuild gives the same data)
     godot-geo-terrain-samples.zip         terrain/ankara_small, fiji_small, norway_small (3-3.6 km test packages)
@@ -48,7 +48,17 @@ def addon_zip(version: str, out: Path) -> Path:
                 archive.write(path, "addons/geo/" + path.relative_to(ADDON).as_posix())
         archive.write(ROOT / "LICENSE", "addons/geo/LICENSE")
         archive.write(ROOT / "THIRD_PARTY_NOTICES.md", "addons/geo/THIRD_PARTY_NOTICES.md")
+        archive.writestr("addons/geo/VERSION.txt", f"godot-geo {version} (commit {git_commit()})\n"
+                         "Documentation and changelog: https://github.com/OWNER/godot-geo\n")
     return target
+
+
+def git_commit() -> str:
+    try:
+        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, check=True, capture_output=True,
+                              text=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
 
 
 def check_package(src: Path) -> dict:

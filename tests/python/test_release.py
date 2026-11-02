@@ -17,6 +17,7 @@ def test_addon_zip_layout(tmp_path):
     assert all(n.startswith("addons/geo/") for n in names)
     assert "addons/geo/geo_terrain.gd" in names and "addons/geo/geo_terrain.gd.uid" in names
     assert "addons/geo/LICENSE" in names and "addons/geo/THIRD_PARTY_NOTICES.md" in names
+    assert "addons/geo/VERSION.txt" in names
     assert not [n for n in names if n.endswith(".import")]
 
 

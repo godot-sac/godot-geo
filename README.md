@@ -68,7 +68,8 @@ tools/.venv/Scripts/python -I tools/build_terrain.py --lat 39.9334 --lon 32.8597
 Or from your own files, without network access ([details](docs/own-data.md)):
 ```sh
 tools/.venv/Scripts/python -I tools/build_terrain.py --fetch-geoid      # once, on a connected machine
-tools/.venv/Scripts/python -I tools/build_terrain.py --lat 39.93 --lon 32.86 --size 20000 --spacing 30     --dem path/to/dted --imagery hillshade --attribution "<data notice>" --offline --out terrain/mine
+tools/.venv/Scripts/python -I tools/build_terrain.py --lat 39.93 --lon 32.86 --size 21000 --spacing 30 \
+    --dem path/to/dted --imagery hillshade --attribution "<data notice>" --offline --out terrain/mine
 ```
 Load it:
 ```gdscript

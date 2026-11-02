@@ -6,7 +6,7 @@ no Python and no network access after the download.
 ![Line of sight over the terrain south-east of Ankara](getting-started/step1.jpg)
 
 ## What you need
-- Godot 4.7 (standard build; the .NET build works too). Any renderer: Forward+, Mobile or Compatibility.
+- Godot 4.7. Any renderer: Forward+, Mobile or Compatibility.
 - From the [releases page](https://github.com/OWNER/godot-geo/releases), two files of the same release:
   - `godot-geo-<version>.zip`: the addon (25 KB).
   - `godot-geo-terrain-ankara-40km.zip`: a prebuilt terrain package, 40 × 40 km around Ankara at 10 m (90 MB).
@@ -185,7 +185,7 @@ const TARGET := Vector2(39.9420, 32.8700)
 	terrain.package_path = "res://terrain/ankara_small"
 	camera.look_at_from_position(middle + Vector3(-500.0, 900.0, 1800.0), middle)
 ```
-and use a radius of 1500 instead of 3000 for the viewshed.
+and change both `3000.0` values of the viewshed lines to `1500.0`.
 
 ## Your own elevation data (DTED / GeoTIFF)
 Packages are made by `tools/build_terrain.py` in the godot-geo repository. It needs Python 3.12 or newer and works
@@ -194,11 +194,15 @@ offline with your own files. In a clone of the repository (Windows paths; on Lin
 ```sh
 python -m venv tools/.venv
 tools/.venv/Scripts/python -m pip install -r tools/requirements.txt
-tools/.venv/Scripts/python -I tools/build_terrain.py --fetch-geoid      # once, needs the network (geoid grids)
-tools/.venv/Scripts/python -I tools/build_terrain.py --lat 39.93 --lon 32.86 --size 20000 --spacing 30 \
+tools/.venv/Scripts/python -I tools/build_terrain.py --fetch-geoid      # once, needs the network (83 MB)
+tools/.venv/Scripts/python -I tools/build_terrain.py --lat 39.93 --lon 32.86 --size 21000 --spacing 30 \
     --dem path/to/dted --imagery hillshade --attribution "Elevation: <your data notice>" --offline \
     --out <your project>/terrain/mine
 ```
+`--size` (edge of the square, metres) must be a multiple of `--spacing`. The pip install downloads large
+wheels (rasterio and pyproj include GDAL and PROJ); `--fetch-geoid` stores the EGM2008 and EGM96 geoid grids
+(83 MB) in `tools/.cache/geoid/` for offline builds.
+
 `--dem` takes DTED cells (`.dt0/.dt1/.dt2`) or GeoTIFF files in any CRS, or a folder of them; `--imagery` a
 GeoTIFF orthophoto or `hillshade`. Then set `terrain.package_path = "res://terrain/mine"`. Vertical datum, gaps
 and other options: [own-data.md](own-data.md).
