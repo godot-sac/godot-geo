@@ -149,7 +149,11 @@ footprint and reach 2 m below it.
 
 **Heights.** OpenStreetMap `height`, else `building:levels` × 3 m, else the GHSL GHS-BUILT-H average net building
 height of the 100 m cell varied per building, else 3–6 floors. In the 10 km Üsküdar package 0.3 % come from a
-height tag, 3.8 % from levels and 95.8 % from GHSL (Microsoft's ML footprints have no heights for Türkiye).
+height tag, 3.8 % from levels and 95.8 % from GHSL (Microsoft's ML footprints have no heights for Türkiye); in the
+60 km package 3.5 % tag, 4.1 % levels, 91.3 % GHSL, 1.0 % default. Check against the 1 596 tagged buildings of the
+60 km package: GHSL median 15.0 m, tags 15.7 m; DSM minus ground under the footprint gave 9.8 m and is not used.
+GHSL is a 100 m cell average, so single buildings can be several floors off. What this means in practice:
+[city.md](city.md#how-close-to-reality).
 
 **Measurements** (10 km Üsküdar package, 1920 × 1080, RTX 4080, Windows, `demo/city.tscn -- --bench`): a fixed
 route at 150 m and 500 m above the ground with all layers streaming: median frame 2.0 ms, p95 2.9–3.3 ms, p99
@@ -218,5 +222,6 @@ nodes ([stats](phase2/stats.json), [views](phase2/views_sheet.jpg)).
 - Close to the ground the picture is limited by the data (30 m DEM, 10 m imagery); the land cover detail textures
   and the 3D layers hide it at the scale of a street, not of a doorway.
 - Building heights are mostly estimates (see [Layers](#layers)); roof shapes are guessed for untagged buildings.
+  Buildings and trees have no collision shapes; only the visibility queries see them.
   Bridge decks follow the ground at the bridge ends: the Bosphorus bridges sit 10–20 m lower than reality and have
   no towers or cables.

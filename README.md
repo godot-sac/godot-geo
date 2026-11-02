@@ -38,6 +38,8 @@ rights reserved.</sub>
   ETH canopy height; buildings from OpenStreetMap / Overture footprints with heights (tags, levels, GHSL estimates),
   roof shapes and windows, an approximate bare-earth ground under them; roads and bridges from OpenStreetMap. Each is
   a node that streams around the camera ([layers](docs/geo-terrain.md#layers)); military areas are never included.
+  Positions follow the open data closely, most building heights are estimates
+  ([how close to reality](docs/city.md#how-close-to-reality)).
 - **City demo** (`demo/city.tscn`): Üsküdar, Istanbul, with camera bookmarks, a scripted check and a benchmark
   ([city view](docs/city.md)).
 - **Queries:** `height_at(x, z)`, `geodetic_height(lat, lon)`, conversions between geodetic and scene positions.

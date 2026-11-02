@@ -68,6 +68,33 @@ Altunizade, and the Üsküdar seafront. The others: Kız Kulesi, the Küçük Ç
 15 Temmuz Şehitler bridge, Kuzguncuk, Beylerbeyi Palace and an overview. Military sites are never bookmarked, and
 their buildings are not in the packages.
 
+## How close to reality
+The packages are built only from open data, without surveying anything by hand. What that gives:
+
+| | Source | Fidelity |
+|---|---|---|
+| Building positions and outlines | OpenStreetMap, Overture Maps (incl. Microsoft ML footprints) | traced from aerial imagery: blocks, streets and squares are where they are on a map |
+| Roads, bridges, shoreline | OpenStreetMap | as mapped; road surfaces are painted on the ground (no kerbs, pavement edges or street furniture) |
+| Ground shape | Copernicus DEM 30 m, resampled to 5 m | hills, slopes and valleys are right; steps, retaining walls and cuttings narrower than ~30 m are not there |
+| Building heights | OSM `height` / `building:levels` for ~8 %, GHSL 100 m average for ~91 % | the skyline of a neighbourhood is close; a single building can be several floors off (see below) |
+| Building look | own procedural walls, windows and roofs | a landmark is recognisable by position and mass, not by facade or signage |
+| Trees | ETH canopy height 10 m, ESA WorldCover | where and how tall the canopy is; trees are generic, placed deterministically |
+
+**Building heights.** In Istanbul almost no building has a height in open data, and Microsoft's footprints carry no
+height for Türkiye, so most heights come from GHSL GHS-BUILT-H: the average building height of each 100 × 100 m
+cell, varied slightly per building. On average it holds: across the 1 596 tagged buildings of the 60 km package the
+GHSL median is 15.0 m against 15.7 m from the tags. Within one cell, though, a two-storey house next to a ten-storey
+block gets a similar height. Every height added to OpenStreetMap (`height` or `building:levels`) is used the next
+time a package is built.
+
+**Walking around.** `F` puts the camera on the ground; the whole 10 km package (roughly Kadıköy to Beylerbeyi,
+Harem to the east of Çamlıca) can be walked. Buildings have no collision yet, so the walker passes through walls;
+`height_at`, the terrain collision and the visibility queries do see the ground, and `line_of_sight`, `raycast`
+and `viewshed` also see buildings and tree crowns.
+
+In short: from 100–500 m above the ground the area is recognisable and good enough for simulation and line of
+sight work; at street level the layout is right, the heights and looks of single buildings are approximate.
+
 ## Measurements
 10 km package, 1920 × 1080, RTX 4080, Windows, all layers (`--bench`): median frame 2.0 ms, p99 7.1 ms at 150 m and
 7.6 ms at 500 m above the ground; 5–6 frames per run over 33 ms (when the far road ring moves, once per 2 km).
