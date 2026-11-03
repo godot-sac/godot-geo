@@ -2,7 +2,7 @@
   "format": "godot-geo-terrain",
   "format_version": 1,
   "generator": "godot-geo tools/build_terrain.py 0.1.0",
-  "created": "2026-11-01T16:57:06+00:00",
+  "created": "2026-11-03T06:43:17+00:00",
   "origin": {
     "latitude": 69.99,
     "longitude": 23.27,
@@ -19,6 +19,7 @@
     "max": 234.7679901123047,
     "reference": "ENU up relative to the origin; geoid and Earth curvature included",
     "interpolation": "bilinear between samples",
+    "surface": "dsm",
     "sha256": "79c96dca68388abf1208b65b0c0d970c0f77e29f891662e4025b0ed078695417"
   },
   "color": {
@@ -26,7 +27,7 @@
     "encoding": "PNG RGB8, sRGB (Sentinel-2 L2A true colour (TCI))",
     "samples": 101,
     "spacing_m": 30.0,
-    "sha256": "d9b9390b3e65c4be946623f516613dae7327a600bcabe1ba48916c6e1bbbd66c"
+    "sha256": "d3c0f9e910621b341906fbd6f454a135868a8ea01c9ad6396bebe764ebae4d6f"
   },
   "corners": {
     "nw": {

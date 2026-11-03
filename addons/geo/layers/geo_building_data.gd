@@ -5,6 +5,8 @@ class_name GeoBuildingData
 extends RefCounted
 
 const CELL := 25.0
+## Largest decompressed tile accepted, bytes (a corrupted size must not allocate gigabytes).
+const MAX_TILE_BYTES := 256 << 20
 enum Roof { FLAT, GABLED, HIPPED, PYRAMIDAL, DOME, ONION }
 
 var path := ""
@@ -14,6 +16,8 @@ var tiles_x := 0
 var tiles_z := 0
 var count := 0
 var half := 0.0
+## Tiles beyond its own that a footprint may reach into (from the file header; queries search that far).
+var reach := 1
 var _file: FileAccess
 var _index := PackedInt64Array()  # per tile: offset, zlib size, raw size, count
 var _tiles := {}  # tile index -> [Array of buildings, {Vector2i cell: PackedInt32Array of building indices}]
@@ -41,15 +45,35 @@ func _open() -> String:
 		return "%s: not a godot-geo buildings file" % path
 	if head.decode_u16(4) != 1:
 		return "%s: version %d not supported" % [path, head.decode_u16(4)]
+	reach = clampi(head.decode_u16(6), 1, 4)  # older files wrote 0; a footprint is at most ~1.6 km from its tile
 	tile_m = head.decode_float(8)
 	tiles_x = head.decode_u16(12)
 	tiles_z = head.decode_u16(14)
 	count = head.decode_u32(16)
-	var idx := _file.get_buffer(16 * tiles_x * tiles_z)
-	_index.resize(4 * tiles_x * tiles_z)
-	for i in tiles_x * tiles_z:
+	var err := read_index(_file, tile_m, tiles_x, tiles_z, half * 2.0, _index)
+	return "%s: %s" % [path, err] if not err.is_empty() else ""
+
+
+## Reads and checks the tile index of buildings.bin / roads.bin (after the 20-byte header) into `index` (offset,
+## zlib size, raw size, count per tile). Returns an error text for a header or index that does not fit the
+## package or the file (a corrupted or hostile file must neither allocate gigabytes nor read past its end).
+static func read_index(file: FileAccess, tile_m: float, tiles_x: int, tiles_z: int, size_m: float,
+		index: PackedInt64Array) -> String:
+	if not is_finite(tile_m) or tile_m <= 0.0 or tile_m > size_m * 1.01:
+		return "tile size %s does not fit the package" % tile_m
+	if absf(tiles_x * tile_m - size_m) > tile_m or absf(tiles_z * tile_m - size_m) > tile_m:
+		return "%d x %d tiles of %s m do not cover the package" % [tiles_x, tiles_z, tile_m]
+	var length := file.get_length()
+	var n := tiles_x * tiles_z
+	if 20 + 16 * n > length:
+		return "tile index longer than the file"
+	var idx := file.get_buffer(16 * n)
+	index.resize(4 * n)
+	for i in n:
 		for k in 4:
-			_index[i * 4 + k] = idx.decode_u32(i * 16 + k * 4)
+			index[i * 4 + k] = idx.decode_u32(i * 16 + k * 4)
+		if index[i * 4 + 3] > 0 and (index[i * 4] + index[i * 4 + 1] > length or index[i * 4 + 2] > MAX_TILE_BYTES):
+			return "tile %d lies outside the file or is too large" % i
 	return ""
 
 
@@ -195,8 +219,8 @@ func segment_hit(a: Vector3, b: Vector3, t_max := 1.0) -> Dictionary:
 		var ti := tile_of(p.x, p.y)
 		var cell := Vector2i(floori(p.x / CELL), floori(p.y / CELL))
 		# A building is filed under the tile of its centroid but may reach into neighbouring tiles.
-		for tj in range(ti.y - 1, ti.y + 2):
-			for tii in range(ti.x - 1, ti.x + 2):
+		for tj in range(ti.y - reach, ti.y + reach + 1):
+			for tii in range(ti.x - reach, ti.x + reach + 1):
 				if tile_count(tii, tj) == 0:
 					continue
 				var key := tj * tiles_x + tii
@@ -284,8 +308,8 @@ func buildings_in(rect: Rect2) -> Array:
 	var out := []
 	var a := tile_of(rect.position.x, rect.position.y)
 	var b := tile_of(rect.end.x, rect.end.y)
-	for j in range(a.y - 1, b.y + 2):
-		for i in range(a.x - 1, b.x + 2):
+	for j in range(a.y - reach, b.y + reach + 1):
+		for i in range(a.x - reach, b.x + reach + 1):
 			if tile_count(i, j) == 0:
 				continue
 			for bld: Dictionary in tile(i, j):
@@ -297,8 +321,8 @@ func buildings_in(rect: Rect2) -> Array:
 ## The building whose footprint contains package-frame x, z (its Dictionary), or an empty one.
 func building_at(x: float, z: float) -> Dictionary:
 	var ti := tile_of(x, z)
-	for dj in range(-1, 2):
-		for di in range(-1, 2):
+	for dj in range(-reach, reach + 1):
+		for di in range(-reach, reach + 1):
 			var i := ti.x + di
 			var j := ti.y + dj
 			if tile_count(i, j) == 0:

@@ -148,12 +148,12 @@ func is_loaded() -> bool:
 func _clear() -> void:
 	# Freed at once: a node waiting in queue_free outside the tree counts as an orphan (and leaks if the tree goes).
 	# Leaving the tree does not clear anything; the internal children are freed with this node.
+	for l in layers():  # first: it waits for the layers' worker tasks, which still read the backend
+		l.setup(null)
 	for n: Node in [_backend, _body]:
 		if n:
 			remove_child(n)
 			n.free()
-	for l in layers():
-		l.setup(null)
 	_backend = null
 	_body = null
 	_shape = null
@@ -230,12 +230,16 @@ func water_at(x: float, z: float) -> float:
 
 ## Global position of a geodetic point (degrees, metres above the WGS84 ellipsoid) in this terrain's frame.
 func geodetic_to_global(lat: float, lon: float, h: float) -> Vector3:
+	if package == null:
+		return Vector3(NAN, NAN, NAN)
 	var p := GeoMath.geodetic_to_local(lat, lon, h, package.latitude, package.longitude, package.origin_height)
 	return to_global(p + Vector3(0.0, origin_offset, 0.0))
 
 
 ## [lat, lon, h] of a global position.
 func global_to_geodetic(p: Vector3) -> PackedFloat64Array:
+	if package == null:
+		return PackedFloat64Array([NAN, NAN, NAN])
 	var l := to_local(p) - Vector3(0.0, origin_offset, 0.0)
 	return GeoMath.local_to_geodetic(l, package.latitude, package.longitude, package.origin_height)
 

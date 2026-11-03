@@ -2,7 +2,7 @@
   "format": "godot-geo-terrain",
   "format_version": 1,
   "generator": "godot-geo tools/build_terrain.py 0.1.0",
-  "created": "2026-10-31T15:41:50+00:00",
+  "created": "2026-11-03T06:43:08+00:00",
   "origin": {
     "latitude": 39.9334,
     "longitude": 32.8597,
@@ -17,16 +17,17 @@
     "spacing_m": 30.0,
     "min": 875.2296142578125,
     "max": 1035.2506103515625,
-    "reference": "ENU up relative to the origin; EGM2008 geoid and Earth curvature included",
+    "reference": "ENU up relative to the origin; geoid and Earth curvature included",
     "interpolation": "bilinear between samples",
+    "surface": "dsm",
     "sha256": "2922c9e09d64e6c7c3490b0a9d37de098e2a78320b96cb03815be97f68132422"
   },
   "color": {
     "file": "color.png",
-    "encoding": "PNG RGB8, sRGB (Sentinel-2 L2A TCI)",
+    "encoding": "PNG RGB8, sRGB (Sentinel-2 L2A true colour (TCI))",
     "samples": 181,
     "spacing_m": 20.0,
-    "sha256": "7e5ed396df8805852c8b17a6c9ce1ec336b08b6c1408b1ef598e7c7ac248bc17"
+    "sha256": "eba141bea3b71ad0881ad7e3ed95188d1ec8115d34700d25d54adf872c1bc08e"
   },
   "corners": {
     "nw": {
@@ -39,19 +40,19 @@
       "east": 1800.0,
       "north": 1800.0,
       "latitude": 39.94960940851617,
-      "longitude": 32.88076332367884
+      "longitude": 32.88076332367885
     },
     "sw": {
       "east": -1800.0,
       "north": -1800.0,
       "latitude": 39.91718672141759,
-      "longitude": 32.838646612545624
+      "longitude": 32.83864661254563
     },
     "se": {
       "east": 1800.0,
       "north": -1800.0,
       "latitude": 39.917186721417586,
-      "longitude": 32.88075338745437
+      "longitude": 32.88075338745438
     }
   },
   "sources": {
@@ -72,6 +73,14 @@
       "n_min_m": 37.19170760958055,
       "n_max_m": 37.198510102996984
     },
+    "geoids": [
+      {
+        "model": "EGM2008",
+        "grid": "PROJ us_nga_egm08_25.tif (NGA, public domain)",
+        "n_min_m": 37.19170760958055,
+        "n_max_m": 37.198510102996984
+      }
+    ],
     "imagery": {
       "product": "Sentinel-2 L2A true colour (TCI)",
       "access": "Earth Search STAC (earth-search.aws.element84.com/v1)",

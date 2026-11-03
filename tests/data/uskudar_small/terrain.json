@@ -2,7 +2,7 @@
   "format": "godot-geo-terrain",
   "format_version": 1,
   "generator": "godot-geo tools/build_terrain.py 0.1.0",
-  "created": "2026-11-02T18:07:37+00:00",
+  "created": "2026-11-03T06:43:23+00:00",
   "origin": {
     "latitude": 41.024,
     "longitude": 29.012,
@@ -23,7 +23,7 @@
     "sha256": "1a8f9fc320f7d27408e75ef28c21767ea22f25fbd3e368782fbb4036683512d9",
     "ground_model": {
       "method": "DEM filled in under building footprints from the surrounding samples, lowered by half the canopy height under trees, never above the DEM (tools/buildings.py)",
-      "removed_median_m": 4.2721405029296875,
+      "removed_median_m": 4.2719268798828125,
       "removed_p90_m": 8.0
     }
   },
@@ -32,7 +32,7 @@
     "encoding": "PNG RGB8, sRGB (Sentinel-2 L2A true colour (TCI))",
     "samples": 201,
     "spacing_m": 15.0,
-    "sha256": "5a82abc0b9b05c968e7f7552bf80795499715bb221f65e3703f37e2104c1ef3a"
+    "sha256": "f1fb7a77585d5eee1d17e8b087b090521df0cee00cf703231cb62aa1c186a78b"
   },
   "corners": {
     "nw": {
@@ -132,7 +132,7 @@
     },
     "license": "ODbL-1.0 (derived from OpenStreetMap)",
     "water_share": 0.5569057406359413,
-    "sha256": "2cfcd036a6148e1a5386992a55f7f849ce22194d85e9e80075be66cab468bf0a"
+    "sha256": "39aa0aaa9edd77b224da3503a79a888660a35587f80e8b8cca6cf43bfbd630d2"
   },
   "landcover": {
     "file": "landcover.png",
@@ -155,7 +155,7 @@
       "bare / sparse vegetation": 0.0023,
       "permanent water bodies": 0.5588
     },
-    "sha256": "2563d26e70829faae1b62c9f8a0876076120bd225f5c57d412c0f3dc1da23333"
+    "sha256": "4614d5459a464c899910d11379c994007039c62a161ddc38aa227254d588a4f9"
   },
   "canopy": {
     "file": "canopy.png",
@@ -170,7 +170,7 @@
       ]
     },
     "license": "CC-BY-4.0",
-    "sha256": "0b65d8df5f0e94c85372df1ac7c2b3b34f4770fe578e94fcc07b8592d625770e"
+    "sha256": "50de3f6b62c99eef2695af66f70e1bc1a27b0b4c5bc795e27ad628bc41a8f843"
   },
   "buildings": {
     "file": "buildings.bin",
@@ -179,7 +179,8 @@
     "tiles": {
       "x": 6,
       "z": 6,
-      "non_empty": 22
+      "non_empty": 22,
+      "reach": 1
     },
     "count": 3626,
     "height_sources": {
@@ -200,7 +201,7 @@
       "height_hint": "GHS-BUILT-H R2023A ANBH 2018 (100 m)"
     },
     "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)",
-    "sha256": "57f6c5a4ea7fd2547d31258167604a6a173b028e5b8c16ca85b818c340784c20"
+    "sha256": "599f75eaeae7c5ce7d90b554b1617d320edd8e42c916ec9524a0927cb8ba9dc7"
   },
   "footprints": {
     "file": "footprints.png",
@@ -208,7 +209,7 @@
     "samples": 201,
     "spacing_m": 15.0,
     "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)",
-    "sha256": "786c4b7ef43f41d645a145d02e6a35eff7ba790b7fe0782da4b4b8be8c63e9fe"
+    "sha256": "b3d2f6ce878a656b911acff6e02619b32ffff4b2fe385412f56cc53486b974dd"
   },
   "roads": {
     "file": "roads.bin",
@@ -227,6 +228,6 @@
       "access": "s3://overturemaps-us-west-2/release/2026-10-21.0/theme=transportation"
     },
     "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)",
-    "sha256": "13ac25cdb7e74bf06fc6ffe62cfa8d2f3fbf10f78ab4131b06536b02321eecc2"
+    "sha256": "7827b85f0583f506af0781889ce6b02ca3a7460564d0d9140ac8f5e221c7c68e"
   }
 }

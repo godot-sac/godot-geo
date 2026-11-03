@@ -766,8 +766,9 @@ MAX_SCENE_READS = 12
 
 
 def sample_lat_lon(grid: Grid) -> tuple[np.ndarray, np.ndarray]:
+    """Latitude / longitude of the terrain surface point of every grid sample (geo_layers.set_surface)."""
     e, n = grid.rows(0, grid.count)
-    lat, lon, _ = enu_to_geodetic(e, n, np.zeros_like(e), grid.lat0, grid.lon0, grid.h0)
+    lat, lon, _ = enu_to_geodetic(e, n, geo_layers.surface_up(e, n), grid.lat0, grid.lon0, grid.h0)
     return lat, grid.lon0 + wrap_lon(lon - grid.lon0)
 
 
@@ -979,6 +980,7 @@ def write_package(out: Path, grid: Grid, color_grid: Grid, height: np.ndarray, c
 def build(args: argparse.Namespace) -> dict:
     global OFFLINE
     OFFLINE = args.offline
+    geo_layers.set_surface(None, None)
     NETWORK_USED.clear()
     grid = Grid(args.lat, args.lon, args.origin_height, args.size, args.spacing)
     color_grid = Grid(args.lat, args.lon, args.origin_height, args.size, args.color_spacing or args.spacing)
@@ -988,6 +990,7 @@ def build(args: argparse.Namespace) -> dict:
     log("elevation:")
     dem = DemStack(open_dem_sources(args, grid_bounds(grid, margin_deg=0.01)), args.geoid_grid)
     height = solve_heights(grid, dem)
+    geo_layers.set_surface(grid, height)  # imagery and layers are sampled at the surface points
     corners = corner_coordinates(grid)
     clat = np.array([c["latitude"] for c in corners.values()] + [grid.lat0])
     clon = np.array([c["longitude"] for c in corners.values()] + [grid.lon0])

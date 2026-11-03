@@ -92,12 +92,8 @@ func _open(file: String) -> String:
 	tiles_x = head.decode_u16(12)
 	tiles_z = head.decode_u16(14)
 	count = head.decode_u32(16)
-	var idx := _file.get_buffer(16 * tiles_x * tiles_z)
-	_index.resize(4 * tiles_x * tiles_z)
-	for i in tiles_x * tiles_z:
-		for k in 4:
-			_index[i * 4 + k] = idx.decode_u32(i * 16 + k * 4)
-	return ""
+	var err := GeoBuildingData.read_index(_file, tile_m, tiles_x, tiles_z, package.size_m, _index)
+	return "%s: %s" % [file, err] if not err.is_empty() else ""
 
 
 ## Roads of tile (i, j): Array of [class, flags, width, PackedVector2Array points (package x / z),
@@ -115,12 +111,14 @@ func tile(i: int, j: int) -> Array:
 		var b := _file.get_buffer(_index[o + 1]).decompress(_index[o + 2], FileAccess.COMPRESSION_DEFLATE)
 		var center := Vector2(-package.size_m * 0.5 + (i + 0.5) * tile_m, -package.size_m * 0.5 + (j + 0.5) * tile_m)
 		var p := 0
-		while p < b.size():
+		while p + 8 <= b.size():  # a record that does not fit (truncated or corrupted file) ends the tile
 			var cls := b[p]
 			var flags := b[p + 1]
 			var width := b.decode_float(p + 2)
 			var n := b.decode_u16(p + 6)
 			p += 8
+			if p + n * (8 if flags & Flag.BRIDGE else 4) > b.size() or n < 2 or not is_finite(width):
+				break
 			var pts := PackedVector2Array()
 			pts.resize(n)
 			for k in n:

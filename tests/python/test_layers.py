@@ -50,6 +50,26 @@ def test_to_enu_matches_pymap3d():
     assert abs(out[2]).max() < 1e-6
 
 
+def test_to_enu_projects_at_the_surface():
+    """With a surface set, a lon/lat point lands where the package sample (e, n, u) of that point is: on high
+    ground far from the origin that is metres away from the h = 0 projection."""
+    grid = bt.Grid(41.0, 29.0, 0.0, 60000.0, 100.0)
+    heights = np.full((grid.count, grid.count), 900.0)
+    lat, lon = 41.2, 29.25  # ~28 km from the origin
+    try:
+        layers.set_surface(grid, heights)
+        out = shapely.get_coordinates(layers.to_enu(np.array([shapely.Point(lon, lat)]), grid))[0]
+        lat_s, lon_s, _ = pymap3d.enu2geodetic(out[0], out[1], 900.0, grid.lat0, grid.lon0, grid.h0, WGS84)
+        assert abs(lat_s - lat) * 111e3 < 0.05 and abs(lon_s - lon) * 84e3 < 0.05  # the surface point is the input
+        e0, n0, _ = pymap3d.geodetic2enu(lat, lon, 0.0, grid.lat0, grid.lon0, grid.h0, WGS84)
+        assert 2.0 < np.hypot(out[0] - e0, out[1] - n0) < 6.0  # about u * d / R
+        lat_g, lon_g = bt.sample_lat_lon(bt.Grid(41.0, 29.0, 0.0, 60000.0, 30000.0))
+        lat_c, lon_c, _ = pymap3d.enu2geodetic(30000.0, -30000.0, 900.0, 41.0, 29.0, 0.0, WGS84)
+        assert abs(lat_g[2, 2] - lat_c) < 1e-9 and abs(lon_g[2, 2] - lon_c) < 1e-9
+    finally:
+        layers.set_surface(None, None)
+
+
 def test_boxes_split_at_antimeridian():
     assert layers._boxes((10.0, 11.0, 179.5, 180.5)) == [(179.5, 10.0, 180.0, 11.0), (-180.0, 10.0, -179.5, 11.0)]
     assert layers._boxes((10.0, 11.0, 29.0, 29.5)) == [(29.0, 10.0, 29.5, 11.0)]

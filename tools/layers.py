@@ -34,6 +34,31 @@ LAYERS = ("water", "landcover", "canopy", "buildings", "roads")
 
 WGS84 = pymap3d.Ellipsoid.from_name("wgs84")
 
+# ENU up of the terrain surface, set by build_terrain.py once the heights are solved. A package sample at (e, n)
+# is the surface point (e, n, u), whose latitude / longitude differ from those of (e, n, 0) by about u * d / R
+# (metres on high ground far from the origin), so rasters are sampled and vectors projected at the surface.
+_surface = None  # (grid, heights) or None
+
+
+def set_surface(grid, heights) -> None:
+    global _surface
+    _surface = (grid, heights) if heights is not None else None
+
+
+def surface_up(e: np.ndarray, n: np.ndarray) -> np.ndarray:
+    """ENU up of the surface at east / north (bilinear on the height grid; 0 without one or outside)."""
+    if _surface is None:
+        return np.zeros(np.shape(e))
+    grid, h = _surface
+    c = np.clip((np.asarray(e, dtype=np.float64) + grid.half) / grid.spacing, 0.0, grid.count - 1.0)
+    r = np.clip((grid.half - np.asarray(n, dtype=np.float64)) / grid.spacing, 0.0, grid.count - 1.0)
+    c0 = np.minimum(np.floor(c).astype(np.int64), grid.count - 2)
+    r0 = np.minimum(np.floor(r).astype(np.int64), grid.count - 2)
+    fc, fr = c - c0, r - r0
+    a = h[r0, c0] * (1 - fc) + h[r0, c0 + 1] * fc
+    b = h[r0 + 1, c0] * (1 - fc) + h[r0 + 1, c0 + 1] * fc
+    return np.nan_to_num(a * (1 - fr) + b * fr)
+
 
 @dataclass
 class Layer:
@@ -92,11 +117,15 @@ def overture_table(theme: str, kind: str, bounds, columns: list[str], release: s
 # --- rasterising onto the package grid --------------------------------------------------------------------------
 
 def to_enu(geoms: np.ndarray, grid) -> np.ndarray:
-    """Lon/lat geometries -> ENU east/north on the grid's tangent plane (points at h = 0; the height of a point
-    changes its east/north by millimetres only)."""
+    """Lon/lat geometries -> ENU east / north of the points on the terrain surface (see set_surface): projected at
+    h = 0 first, then again at the surface's ellipsoidal height there."""
     def fn(xy: np.ndarray) -> np.ndarray:
         lon = grid.lon0 + ((xy[:, 0] - grid.lon0 + 180.0) % 360.0 - 180.0)
-        e, n, _ = pymap3d.geodetic2enu(xy[:, 1], lon, np.zeros(len(xy)), grid.lat0, grid.lon0, grid.h0, WGS84)
+        lat = xy[:, 1]
+        e, n, _ = pymap3d.geodetic2enu(lat, lon, np.zeros(len(xy)), grid.lat0, grid.lon0, grid.h0, WGS84)
+        if _surface is not None:
+            _, _, h = pymap3d.enu2geodetic(e, n, surface_up(e, n), grid.lat0, grid.lon0, grid.h0, WGS84)
+            e, n, _ = pymap3d.geodetic2enu(lat, lon, h, grid.lat0, grid.lon0, grid.h0, WGS84)
         return np.column_stack([e, n])
     return shapely.transform(geoms, fn)
 
@@ -150,9 +179,10 @@ def tile3(lat: float, lon: float) -> str:
 
 
 def _grid_lat_lon(grid, r0: int, r1: int) -> tuple[np.ndarray, np.ndarray]:
+    """Latitude / longitude of the surface points of grid rows [r0, r1)."""
     e = np.broadcast_to(grid.east()[None, :], (r1 - r0, grid.count))
     n = np.broadcast_to(grid.north()[r0:r1, None], (r1 - r0, grid.count))
-    lat, lon, _ = pymap3d.enu2geodetic(e, n, np.zeros(e.shape), grid.lat0, grid.lon0, grid.h0, WGS84)
+    lat, lon, _ = pymap3d.enu2geodetic(e, n, surface_up(e, n), grid.lat0, grid.lon0, grid.h0, WGS84)
     return lat, (lon + 180.0) % 360.0 - 180.0
 
 

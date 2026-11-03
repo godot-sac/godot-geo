@@ -39,7 +39,7 @@ static func ecef_to_geodetic(ecef: PackedFloat64Array) -> PackedFloat64Array:
 	return PackedFloat64Array([rad_to_deg(phi), rad_to_deg(lam), h])
 
 
-## East, north, up of `ecef` in the tangent frame at the origin (degrees, degrees, metres).
+## East, north, up (metres) of `ecef` in the tangent frame at the origin (latitude, longitude in degrees).
 static func ecef_to_enu(ecef: PackedFloat64Array, lat0: float, lon0: float, h0: float) -> PackedFloat64Array:
 	var o := geodetic_to_ecef(lat0, lon0, h0)
 	var dx := ecef[0] - o[0]

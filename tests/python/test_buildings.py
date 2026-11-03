@@ -124,6 +124,18 @@ def test_encode_roundtrip():
     assert b["tris"] == 4 and b["flags"] == 6 and b["roof"] == 2
 
 
+def test_header_reach_covers_large_footprints():
+    grid = bt.Grid(41.0, 29.0, 0.0, 4000.0, 10.0)
+    big = shapely.box(-1600.0, -10.0, 100.0, 10.0)  # centroid tile centre x -750, reaches x -1600 (2 tiles west)
+    small = shapely.box(10.0, 10.0, 30.0, 30.0)
+    data, tiles = buildings.encode([(0, big, 0, 0, (1, 1, 1), (1, 1, 1), 0.0, 0.0, 10.0, 0.0),
+                                    (1, small, 0, 0, (1, 1, 1), (1, 1, 1), 0.0, 0.0, 10.0, 0.0)], grid)
+    reach = struct.unpack_from("<H", data, 6)[0]
+    assert reach == tiles["reach"] == 2
+    data, tiles = buildings.encode([(1, small, 0, 0, (1, 1, 1), (1, 1, 1), 0.0, 0.0, 10.0, 0.0)], grid)
+    assert struct.unpack_from("<H", data, 6)[0] == 1
+
+
 def test_triangles_cover_area():
     rings = [[(0, 0), (400, 0), (400, 200), (0, 200)], [(100, 50), (100, 150), (200, 150), (200, 50)]]
     tris = buildings._triangles(rings)

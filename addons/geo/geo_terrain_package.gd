@@ -39,6 +39,8 @@ var _buildings: GeoBuildingData
 var _buildings_lock := Mutex.new()
 ## Height of trees where the land cover is tree cover but the canopy layer has no height (as GeoTreeLayer draws).
 const DEFAULT_TREE_HEIGHT := 10.0
+## Share of a tree's height below the surface on a surface-model package (see GeoTreeLayer).
+const TREE_SINK_DSM := 0.45
 
 
 ## Loads the package directory `dir` (res://, user:// or absolute). With `verify` the SHA-256 of each file is checked.
@@ -66,6 +68,13 @@ func _load(dir: String, verify: bool) -> String:
 	if int(meta.get("format_version", 0)) != FORMAT_VERSION:
 		return "%s: format_version %s is not supported (expected %d)" % [json_path, meta.get("format_version"),
 				FORMAT_VERSION]
+	var required := {"origin": ["latitude", "longitude", "height"], "height": ["file", "samples", "spacing_m", "min",
+			"max"], "color": ["file", "samples", "spacing_m"]}
+	for section: String in required:
+		if not (meta.get(section) is Dictionary and (meta[section] as Dictionary).has_all(required[section])):
+			return "%s: \"%s\" lacks one of %s" % [json_path, section, required[section]]
+	if not meta.has("size_m"):
+		return "%s: \"size_m\" missing" % json_path
 	latitude = float(meta.origin.latitude)
 	longitude = float(meta.origin.longitude)
 	origin_height = float(meta.origin.height)
@@ -95,11 +104,20 @@ func _load(dir: String, verify: bool) -> String:
 	if color == null or color.get_size() != Vector2i(color_samples, color_samples):
 		return "%s: missing or wrong size" % meta.color.file
 
+	for key in ["buildings", "roads"]:  # binary layers: read later by their decoders, checked here
+		if meta.has(key):
+			var file := dir.path_join(str(meta[key].get("file", "")))
+			if not FileAccess.file_exists(file):
+				return "%s missing" % file
+			if verify and FileAccess.get_sha256(file) != meta[key].get("sha256"):
+				return "%s: SHA-256 does not match terrain.json" % file
 	for key in LAYER_KEYS:
 		if not meta.has(key):
 			continue
-		var file := dir.path_join(meta[key].file)
-		if verify and FileAccess.get_sha256(file) != meta[key].sha256:
+		var file := dir.path_join(str(meta[key].get("file", "")))
+		if not FileAccess.file_exists(file):
+			return "%s missing" % file
+		if verify and FileAccess.get_sha256(file) != meta[key].get("sha256"):
 			return "%s: SHA-256 does not match terrain.json" % file
 		var img := Image.load_from_file(_global(file))
 		var n := int(meta[key].samples)
@@ -139,7 +157,9 @@ func tree_height_at(x: float, z: float) -> float:
 	if (cls != 10 and h < 3.0) or cls == 80 or layer_value("footprints", x, z) > 0:
 		return 0.0
 	# Tree cover without a canopy height: GeoTreeLayer draws trees of its default height (10 m) there.
-	return h if h >= 3.0 else DEFAULT_TREE_HEIGHT
+	h = h if h >= 3.0 else DEFAULT_TREE_HEIGHT
+	# On a surface model the trees are drawn sunk by TREE_SINK_DSM of their height (the DEM holds the crowns).
+	return h * (1.0 - TREE_SINK_DSM) if str(meta.height.get("surface", "dsm")) == "dsm" else h
 
 
 func has_water() -> bool:

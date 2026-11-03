@@ -154,6 +154,9 @@ static func trace(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, refraction := 
 		t_prev = t
 		c_prev = c
 		t = minf(minf(next[0], next[1]), minf(next[2], t1))
+		if t <= t_prev:  # steps below the resolution of t (absurdly long segments): stop rather than loop forever
+			out.partial = true
+			break
 		for k in 3:
 			while next[k] <= t + 1e-12:
 				next[k] += step[k]
@@ -200,31 +203,60 @@ static func invalid_line(a: Vector3, b: Vector3) -> Dictionary:
 ## First building or tree crown on the segment a -> b before `t_max` (0..1): {hit, t, obstacle ("building" /
 ## "tree"), id (buildings)}. Tree crowns are solid from the ground to the canopy height of their 10 m sample (see
 ## GeoTerrainPackage.tree_height_at), sampled every half land cover sample along the segment.
+## Only the part of the segment over the package is searched. The tree samples within one land cover sample
+## (horizontally) of either end are skipped: an eye standing among trees can still look up or out of its own cell.
 static func obstacle_hit(pkg: GeoTerrainPackage, a: Vector3, b: Vector3, t_max := 1.0, mask := ALL) -> Dictionary:
 	var best := {"hit": false, "t": t_max}
 	if not (a.is_finite() and b.is_finite()) or is_nan(t_max):
 		return best
+	var span := clip_to_package(pkg, a, b)
+	var lo := span.x
+	var hi := minf(span.y, t_max)
+	if lo > hi:
+		return best
+	var a2 := a.lerp(b, lo)
+	var b2 := a.lerp(b, hi)
 	if mask & BUILDINGS:
 		var bd := pkg.buildings_data()
 		if bd:
-			var h := bd.segment_hit(a, b, t_max)
-			if h.hit and h.t < best.t:
-				best = {"hit": true, "t": h.t, "obstacle": "building", "id": h.id}
+			var h := bd.segment_hit(a2, b2)
+			if h.hit:
+				best = {"hit": true, "t": lo + h.t * (hi - lo), "obstacle": "building", "id": h.id}
 	if mask & TREES and pkg.has_layer("canopy"):
-		var step: float = pkg.layer_spacing.canopy * 0.5
+		var cell: float = pkg.layer_spacing.canopy
 		var length := Vector2(b.x - a.x, b.z - a.z).length()
-		var n := maxi(1, ceili(length * best.t / step))
+		var t_end: float = best.t if best.hit else hi
+		var n := maxi(1, ceili(length * (t_end - lo) / (cell * 0.5)))
 		for s in n + 1:
-			var t: float = best.t * s / n
-			var p := a.lerp(b, t)
-			if not pkg.contains(p.x, p.z):
+			var t: float = lo + (t_end - lo) * s / n
+			if length * minf(t, 1.0 - t) < cell:
 				continue
+			var p := a.lerp(b, t)
 			var crown := pkg.tree_height_at(p.x, p.z)
 			if crown > 0.0 and p.y < surface_height(pkg, p.x, p.z) + crown:
 				if t < best.t or not best.hit:
 					best = {"hit": true, "t": t, "obstacle": "tree"}
 				break
 	return best
+
+
+## Parameter range [t0, t1] of segment a -> b over the package square (x / z); t0 > t1 when it misses.
+static func clip_to_package(pkg: GeoTerrainPackage, a: Vector3, b: Vector3) -> Vector2:
+	var half := pkg.size_m * 0.5
+	var t0 := 0.0
+	var t1 := 1.0
+	for axis: int in [0, 2]:
+		var p := a[axis]
+		var d := b[axis] - a[axis]
+		if absf(d) < 1e-12:
+			if p < -half or p > half:
+				return Vector2(1.0, 0.0)
+			continue
+		var ta := (-half - p) / d
+		var tb := (half - p) / d
+		t0 = maxf(t0, minf(ta, tb))
+		t1 = minf(t1, maxf(ta, tb))
+	return Vector2(t0, t1)
 
 
 ## First intersection of the ray from local `from` along `direction`. See GeoTerrain.raycast.
@@ -242,6 +274,11 @@ static func raycast(pkg: GeoTerrainPackage, from: Vector3, direction: Vector3, m
 		if absf(d) > 1e-12:
 			var limit := (half - from[axis]) / d if d > 0.0 else (-half - from[axis]) / d
 			reach = minf(reach, maxf(limit, 0.0) + 1.0)
+	# Vertically, nothing lies below the lowest ground or above the highest ground plus the tallest structure.
+	if dir.y < -1e-12:
+		reach = minf(reach, maxf(from.y - pkg.height_min, 0.0) / -dir.y + 1.0)
+	elif dir.y > 1e-12:
+		reach = minf(reach, maxf(pkg.height_max + 1000.0 - from.y, 0.0) / dir.y + 1.0)
 	var to := from + dir * reach
 	var tr := trace(pkg, from, to, 0.0, true, 0.0)
 	var t_hit: float = tr.t_hit if tr.blocked and (mask & TERRAIN) else 1.0

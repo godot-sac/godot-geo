@@ -67,7 +67,7 @@ func _rebuild() -> void:
 	_canopy = package.layers.get("canopy")
 	_spacing = package.layer_spacing.get("landcover", package.layer_spacing.get("canopy", 10.0))
 	# On a surface model the ground under a forest sits near the crowns; the ground model removes half the canopy.
-	sink = 0.45 if str(package.meta.height.get("surface", "dsm")) == "dsm" else 0.0
+	sink = GeoTerrainPackage.TREE_SINK_DSM if str(package.meta.height.get("surface", "dsm")) == "dsm" else 0.0
 	if _meshes.is_empty():
 		for s in Species.values():
 			_meshes.append(tree_mesh(s))

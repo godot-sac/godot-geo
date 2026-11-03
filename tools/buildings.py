@@ -18,7 +18,8 @@ DEM-minus-ground residual is only logged against tagged heights: in Üsküdar it
 shape, else hipped or gabled (chosen by a hash) for near-rectangular buildings below 30 m, flat otherwise.
 
 File `buildings.bin` (little-endian), tiles of `tile_m` metres in rows from the north-west corner:
-  header   "GGBL" u16 version=1 u16 reserved f32 tile_m u16 tiles_x u16 tiles_z u32 count
+  header   "GGBL" u16 version=1 u16 reach f32 tile_m u16 tiles_x u16 tiles_z u32 count
+           (reach: how many tiles beyond its own a footprint extends into, at least 1; 0 in older files = 1)
   index    tiles_x * tiles_z x (u32 offset, u32 zlib size, u32 raw size, u32 count), offsets from file start
   tile     zlib-compressed records:
     u32 id   u8 flags (bits 0-1 height source: 0 tag, 1 floors, 2 GHSL, 3 default; bit 2 part; bit 3 ML footprint)
@@ -253,7 +254,8 @@ def _rect_like(poly) -> tuple[bool, float, float]:
     a = np.linalg.norm(c[1] - c[0])
     b = np.linalg.norm(c[2] - c[1])
     fill = poly.area / max(mrr.area, 1e-9)
-    return fill > 0.85 and len(poly.exterior.coords) <= 9, min(a, b), max(a, b)
+    # Exactly four corners: the renderer builds hipped / gabled / pyramidal roofs on four-corner outlines only.
+    return fill > 0.85 and len(poly.exterior.coords) == 5, min(a, b), max(a, b)
 
 
 def build_buildings(grid, dsm: np.ndarray, canopy_layer, bounds, release, cache, network, log, sha256_file,
@@ -435,6 +437,7 @@ def _triangles(rings) -> list[tuple[int, int, int]]:
 def encode(records, grid) -> tuple[bytes, dict]:
     tx = int(np.ceil(grid.size / TILE_M))
     tiles: list[list[bytes]] = [[] for _ in range(tx * tx)]
+    reach = 1  # tiles beyond its own that a footprint reaches into (readers search that far)
     for k, poly, flags, shape, facade, roof_c, base, min_h, h, roof_h in records:
         c = poly.centroid
         i = min(max(int((c.x + grid.half) // TILE_M), 0), tx - 1)
@@ -451,8 +454,10 @@ def encode(records, grid) -> tuple[bytes, dict]:
         for r in rings[1:]:
             if _area(r) > 0:
                 r.reverse()
-        if max(max(abs(x), abs(z)) for r in rings for x, z in r) > 32000:
+        extent = max(max(abs(x), abs(z)) for r in rings for x, z in r)
+        if extent > 32000:
             continue  # cannot happen for footprints below ~1.1 km
+        reach = max(reach, int(np.ceil((extent * QUANT - TILE_M / 2) / TILE_M)))
         tris = _triangles(rings)
         buf = [struct.pack("<IBB3B3B4f", k, flags, shape, *facade, *roof_c, base, min_h, h, roof_h),
                struct.pack("<H", len(rings))]
@@ -462,7 +467,7 @@ def encode(records, grid) -> tuple[bytes, dict]:
         buf.append(struct.pack("<H", len(tris)))
         buf.append(np.asarray(tris, dtype="<u2").tobytes() if tris else b"")
         tiles[j * tx + i].append(b"".join(buf))
-    header = b"GGBL" + struct.pack("<HHfHHI", 1, 0, TILE_M, tx, tx, sum(len(t) for t in tiles))
+    header = b"GGBL" + struct.pack("<HHfHHI", 1, reach, TILE_M, tx, tx, sum(len(t) for t in tiles))
     offset = len(header) + 16 * len(tiles)
     index = []
     blobs = []
@@ -473,4 +478,4 @@ def encode(records, grid) -> tuple[bytes, dict]:
         blobs.append(comp)
         offset += len(comp)
     nonempty = sum(1 for t in tiles if t)
-    return header + b"".join(index) + b"".join(blobs), {"x": tx, "z": tx, "non_empty": nonempty}
+    return header + b"".join(index) + b"".join(blobs), {"x": tx, "z": tx, "non_empty": nonempty, "reach": reach}
