@@ -8,9 +8,9 @@ no Python and no network access after the download.
 ## What you need
 - Godot 4.7. Any renderer: Forward+, Mobile or Compatibility.
 - From the [releases page](https://github.com/OWNER/godot-geo/releases), two files of the same release:
-  - `godot-geo-<version>.zip`: the addon (25 KB).
+  - `godot-geo-<version>.zip`: the addon (8 MB, most of it the land cover detail textures).
   - `godot-geo-terrain-ankara-40km.zip`: a prebuilt terrain package, 40 × 40 km around Ankara at 10 m (90 MB).
-    For a quick try there is also `godot-geo-terrain-samples.zip` (0.3 MB, three 3 km packages); see
+    For a quick try there is also `godot-geo-terrain-samples.zip` (0.7 MB, four 3 km packages); see
     [Using the small sample package](#using-the-small-sample-package).
 
 `SHA256SUMS.txt` on the same page lists the checksums of the files.

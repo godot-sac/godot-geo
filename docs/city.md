@@ -51,7 +51,8 @@ tools/.venv/Scripts/python.exe demo/places_sheet.py <dir> <dir>/sheet.jpg [--onl
 
 - `--tour` visits every bookmark inside the package, builds the layers around it, saves `<id>.png` and
   `stats.json` (frame time, primitives, draw calls, layer counts, video memory) and quits.
-- `--check` loads the layers around the three reference views, measures 120 frames at each (p50 / p95 / p99), and
+- `--check` (meant for `terrain/uskudar_10km` or the 60 km package; on the 3 km test package the lines of sight
+  that leave it are skipped) loads the layers around the three reference views, measures 120 frames at each (p50 / p95 / p99), and
   tests lines of sight with known answers: from above the Çamlıca TV tower to above Kız Kulesi (visible), from 40 m
   above the water to a street behind the Üsküdar seafront (hidden by buildings, visible over bare terrain), from
   Bulgurlu to Capitol at street level (hidden), across the Bosphorus (visible). Exit code 1 on a problem.

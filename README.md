@@ -65,8 +65,9 @@ From the [releases page](https://github.com/OWNER/godot-geo/releases):
 - `godot-geo-<version>.zip`: unzip into your project; it contains `addons/geo/`. No plugin needs to be enabled; the
   classes are global.
 - Prebuilt terrain packages, each unzipping to `terrain/<name>/` with an `ATTRIBUTION.txt`:
-  `godot-geo-terrain-ankara-40km.zip` (40 × 40 km at 10 m, 90 MB) and `godot-geo-terrain-samples.zip` (three
-  3 km test packages: Ankara, Fiji across 180°, Norway at 70° N).
+  `godot-geo-terrain-ankara-40km.zip` (40 × 40 km at 10 m, 90 MB), `godot-geo-terrain-uskudar-10km.zip` and
+  `-60km.zip` (Üsküdar, Istanbul, with all layers; 21 MB and 245 MB) and `godot-geo-terrain-samples.zip` (four 3 km
+  test packages: Ankara, Fiji across 180°, Norway at 70° N, Üsküdar with all layers).
 
 Or copy `addons/geo/` from a clone of this repository. [Getting started](docs/getting-started.md) goes from an empty
 project to terrain with a line-of-sight query step by step.
@@ -130,7 +131,9 @@ godot --headless --path . -s addons/gut/gut_cmdln.gd                        # Go
 tools/.venv/Scripts/python -m pytest tests/python -q -p no:cacheprovider     # package builder tests
 ```
 The Python tests compare packages with independent references (GDAL sampling, PROJ geoid grid, pymap3d golden
-data). See [CONTRIBUTING.md](CONTRIBUTING.md).
+data). The first run downloads about 200 MB of Copernicus DEM tiles into `tools/.cache/` (later runs use the cache;
+downloads time out and resume instead of hanging); tests whose data is neither cached nor reachable are skipped or
+fail with a download error. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Release assets (into `build/release/`, not in git; CI attaches them to a draft release on `v*` tags):
 ```sh

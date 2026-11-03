@@ -4,8 +4,8 @@ Assets (in --out, default build/release; nothing here goes into git):
     godot-geo-<version>.zip               addons/geo/ with LICENSE, THIRD_PARTY_NOTICES.md and VERSION.txt
     godot-geo-terrain-ankara-40km.zip     terrain/ankara/: 40 x 40 km around Ankara at 10 m (Copernicus DEM,
                                           Sentinel-2 scene pinned below, so a rebuild gives the same data)
-    godot-geo-terrain-uskudar-10km.zip    terrain/uskudar_10km/: 10 x 10 km of Üsküdar, Istanbul, with all layers
-    godot-geo-terrain-uskudar-60km.zip    terrain/uskudar/: 60 x 60 km around it (both shores, Sabiha Gökçen)
+    godot-geo-terrain-uskudar-10km.zip    terrain/uskudar_10km/: 10 x 10 km of Uskudar, Istanbul, with all layers
+    godot-geo-terrain-uskudar-60km.zip    terrain/uskudar/: 60 x 60 km around it (both shores, Sabiha Gokcen)
     godot-geo-terrain-samples.zip         terrain/ankara_small, fiji_small, norway_small, uskudar_small (test packages)
     SHA256SUMS.txt
 Each terrain zip unpacks into a project as terrain/<name>/ with terrain/.gdignore (the editor must not import the
@@ -14,7 +14,7 @@ package files) and an ATTRIBUTION.txt per package made from its terrain.json.
 Usage (from the repo root):
     python tools/package_release.py --version 0.1.0                  # addon and samples only (any Python 3)
     tools/.venv/Scripts/python -I tools/package_release.py --version 0.1.0 --terrain
-The Ankara and Üsküdar packages are built with tools/build_terrain.py (needs the tools venv and the network or its
+The Ankara and Uskudar packages are built with tools/build_terrain.py (needs the tools venv and the network or its
 cache) unless --ankara / --uskudar-10km / --uskudar-60km name existing packages built with the same arguments.
 """
 import argparse
@@ -151,7 +151,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--version", default="dev")
     parser.add_argument("--out", type=Path, default=ROOT / "build" / "release")
-    parser.add_argument("--terrain", action="store_true", help="also the Ankara and Üsküdar packages")
+    parser.add_argument("--terrain", action="store_true", help="also the Ankara and Uskudar packages")
     parser.add_argument("--ankara", type=Path, help="existing package to pack instead of building it")
     parser.add_argument("--uskudar-10km", type=Path, help="existing package to pack instead of building it")
     parser.add_argument("--uskudar-60km", type=Path, help="existing package to pack instead of building it")

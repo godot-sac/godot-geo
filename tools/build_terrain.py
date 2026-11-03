@@ -102,6 +102,38 @@ OFFLINE = False
 NETWORK_USED: list[str] = []
 
 
+HTTP_TIMEOUT = 60.0  # seconds without data before a download is retried
+HTTP_RETRIES = 4
+
+
+def download(url: str, path: Path) -> None:
+    """Downloads `url` to `path` via `path`.part, with a socket timeout, retries and HTTP Range resume of the partial
+    file (a stalled transfer otherwise hangs the build). HTTPError other than a server error is raised at once."""
+    part = path.with_suffix(path.suffix + ".part")
+    for attempt in range(HTTP_RETRIES):
+        have = part.stat().st_size if part.exists() else 0
+        req = urllib.request.Request(url, headers={"Range": f"bytes={have}-"} if have else {})
+        try:
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r, open(part, "ab" if have else "wb") as f:
+                if have and r.status != 206:  # the server ignored the range: start over
+                    f.truncate(0)
+                while chunk := r.read(1 << 20):
+                    f.write(chunk)
+            part.replace(path)
+            return
+        except urllib.error.HTTPError as err:
+            if err.code == 416:  # nothing left to read: the partial file is complete
+                part.replace(path)
+                return
+            if err.code < 500 or attempt == HTTP_RETRIES - 1:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as err:
+            if attempt == HTTP_RETRIES - 1:
+                raise RuntimeError(f"download of {url} failed: {err}") from err
+        log(f"  retrying {url.rsplit('/', 1)[-1]} ({attempt + 2}/{HTTP_RETRIES})")
+        time.sleep(2.0 * (attempt + 1))
+
+
 def network(what: str) -> None:
     """Call before any download. Raises with --offline; otherwise records what went over the network."""
     if OFFLINE:
@@ -227,13 +259,12 @@ def fetch_dem_tile(name: str) -> Path | None:
     path.parent.mkdir(parents=True, exist_ok=True)
     log(f"  downloading {name}")
     try:
-        urllib.request.urlretrieve(DEM_URL.format(t=name), path.with_suffix(".part"))
+        download(DEM_URL.format(t=name), path)
     except urllib.error.HTTPError as err:
         if err.code in (403, 404):
             missing.touch()
             return None
         raise
-    path.with_suffix(".part").rename(path)
     return path
 
 
@@ -539,8 +570,7 @@ def fetch_geoids() -> None:
         network(f"PROJ CDN geoid grid {grid}")
         path.parent.mkdir(parents=True, exist_ok=True)
         log(f"downloading {grid}")
-        urllib.request.urlretrieve(PROJ_CDN.format(f=grid), path.with_suffix(".part"))
-        path.with_suffix(".part").rename(path)
+        download(PROJ_CDN.format(f=grid), path)
         log(f"  {path} ({path.stat().st_size / 1e6:.1f} MB)")
 
 
@@ -657,7 +687,7 @@ def _stac_search(collection: str, bbox: list[float], year: int, max_cloud: float
         }
         req = urllib.request.Request(STAC_SEARCH, data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req) as r:
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
             for f in json.load(r)["features"]:
                 found.setdefault(f["id"], f)
     return list(found.values())
@@ -667,7 +697,7 @@ def stac_item(scene_id: str) -> dict:
     network("Earth Search STAC (Sentinel-2)")
     collection = S2_COLLECTIONS[1] if scene_id.split("_")[1].startswith("T") else S2_COLLECTIONS[0]
     url = f"https://earth-search.aws.element84.com/v1/collections/{collection}/items/{scene_id}"
-    with urllib.request.urlopen(url) as r:
+    with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as r:
         return json.load(r)
 
 

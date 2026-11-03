@@ -120,7 +120,8 @@ func update_view(camera: Vector3) -> void:
 		var prepared: Dictionary = _results.get(key, {})
 		_results.erase(key)
 		_lock.unlock()
-		if _chunk_center(key).distance_to(cam) < reach + chunk_size:
+		# build_all_around() may have built the chunk meanwhile.
+		if not _chunks.has(key) and _chunk_center(key).distance_to(cam) < reach + chunk_size:
 			_add_chunk(key, prepared)
 		if (Time.get_ticks_usec() - t0) / 1000.0 > build_budget_ms:
 			break

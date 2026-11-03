@@ -92,11 +92,13 @@ func _entry(i: int, j: int) -> Array:
 	return e
 
 
+## Records of a tile; stops at the first record that does not fit the buffer (truncated or corrupted file) and
+## drops buildings without an outline or with triangle indices beyond their vertices.
 func _decode(b: PackedByteArray, center: Vector2) -> Array:
 	var out := []
 	var p := 0
 	var q := 0.05
-	while p < b.size():
+	while p + 30 <= b.size():
 		var d := {}
 		d.id = b.decode_u32(p)
 		d.flags = b[p + 4]
@@ -113,9 +115,15 @@ func _decode(b: PackedByteArray, center: Vector2) -> Array:
 		var rings := []
 		var lo := Vector2(INF, INF)
 		var hi := Vector2(-INF, -INF)
+		var verts := 0
 		for r in nr:
+			if p + 2 > b.size():
+				return out
 			var n := b.decode_u16(p)
 			p += 2
+			if p + 4 * n > b.size():
+				return out
+			verts += n
 			var ring := PackedVector2Array()
 			ring.resize(n)
 			for k in n:
@@ -127,14 +135,22 @@ func _decode(b: PackedByteArray, center: Vector2) -> Array:
 			rings.append(ring)
 		d.rings = rings
 		d.aabb = Rect2(lo, hi - lo)
+		if p + 2 > b.size():
+			return out
 		var nt := b.decode_u16(p)
 		p += 2
+		if p + 6 * nt > b.size():
+			return out
 		var tris := PackedInt32Array()
 		tris.resize(nt * 3)
+		var tris_ok := true
 		for k in nt * 3:
 			tris[k] = b.decode_u16(p + k * 2)
+			tris_ok = tris_ok and tris[k] < verts
 		p += nt * 6
-		d.tris = tris
+		d.tris = tris if tris_ok else PackedInt32Array()
+		if rings.is_empty() or (rings[0] as PackedVector2Array).size() < 3:
+			continue
 		out.append(d)
 	return out
 

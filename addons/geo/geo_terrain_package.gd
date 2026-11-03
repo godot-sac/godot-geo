@@ -36,6 +36,9 @@ var water: Image
 var water_samples := 0
 var water_spacing := 0.0
 var _buildings: GeoBuildingData
+var _buildings_lock := Mutex.new()
+## Height of trees where the land cover is tree cover but the canopy layer has no height (as GeoTreeLayer draws).
+const DEFAULT_TREE_HEIGHT := 10.0
 
 
 ## Loads the package directory `dir` (res://, user:// or absolute). With `verify` the SHA-256 of each file is checked.
@@ -115,12 +118,14 @@ func _load(dir: String, verify: bool) -> String:
 ## The package's buildings (buildings.bin), opened on first use and shared by the building layer and the
 ## visibility queries; null if the package has none.
 func buildings_data() -> GeoBuildingData:
+	_buildings_lock.lock()  # first use may come from the building layer's tasks and a query thread at once
 	if _buildings == null and meta.has("buildings"):
 		var d := GeoBuildingData.open(_global(path.path_join(meta.buildings.file)), size_m)
 		if d.ok():
 			_buildings = d
 		else:
 			push_error("GeoTerrainPackage: " + d.error)
+	_buildings_lock.unlock()
 	return _buildings
 
 
@@ -133,7 +138,8 @@ func tree_height_at(x: float, z: float) -> float:
 	var cls := layer_value("landcover", x, z)
 	if (cls != 10 and h < 3.0) or cls == 80 or layer_value("footprints", x, z) > 0:
 		return 0.0
-	return h if h >= 3.0 else 0.0
+	# Tree cover without a canopy height: GeoTreeLayer draws trees of its default height (10 m) there.
+	return h if h >= 3.0 else DEFAULT_TREE_HEIGHT
 
 
 func has_water() -> bool:

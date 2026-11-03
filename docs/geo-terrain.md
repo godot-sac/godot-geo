@@ -130,6 +130,20 @@ camera (each wave fades out before it gets shorter than a few pixels, so the far
 roughness rises with distance, a shallow tint follows the shore, and far away the water takes the imagery's tone.
 No bathymetry: the sea floor is not modelled.
 
+## Accuracy
+What the numbers mean for a simulation, from the data up:
+
+| Source of error | Size | Notes |
+|---|---|---|
+| Copernicus DEM GLO-30 (the data) | absolute vertical < 4 m (LE90), horizontal < 6 m (CE90), 30 m posts | product specification; it is a surface model (roofs, crowns), see [Layers](#layers) for the approximate ground under buildings |
+| Resampling to the package grid | 0.23 mm at grid points against GDAL bilinear sampling | tested (`tests/python`) |
+| Triangulated surface vs bilinear | a few metres at most at cell centres in rough terrain, 0 at grid points | the drawn surface, `height_at`, collision and queries all use the triangles |
+| Geoid (EGM2008 grid, 2.5') | about 7 cm against the NGA test point | applied once when the package is built |
+| WGS84 / ENU / ECEF conversions | below 1 mm | `GeoMath` in double precision; tested against pymap3d and PROJ |
+| Scene positions | float32 in standard Godot builds: about 2 mm at 30 km from the origin | fine for one package; larger worlds need a double-precision build |
+| Sentinel-2 imagery | 10 m pixels, georeferenced to about 10 m | colour only |
+| Layers (water, buildings, roads, trees) | OpenStreetMap / Overture positions; heights mostly estimated | see [city view: how close to reality](city.md#how-close-to-reality) |
+
 ## Layers
 Children of `GeoTerrain` derived from `GeoTerrainLayer` draw what the package's optional layers describe (see
 [package format](package-format.md) and `tools/layers.py`, `tools/buildings.py`, `tools/roads.py`). With

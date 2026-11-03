@@ -18,6 +18,9 @@ const BLOCKED_COLOR := Color(1.0, 0.85, 0.1)
 
 var observer := Vector3.ZERO  # ground point; the eye is observer_height above it
 var observer_height := 10.0
+## What blocks the view (GeoVisibility mask): everything the package has; --check tests the terrain alone (the city
+## layers are checked by demo/city.tscn --check), so a package with buildings does not put its observer in a house.
+var query_mask := GeoVisibility.ALL
 var target_height := 2.0
 var radius := 3000.0
 var refraction_index := 0
@@ -135,7 +138,8 @@ func start_viewshed() -> void:
 	var th := target_height
 	var res := resolution
 	var k := _refraction()
-	_task = WorkerThreadPool.add_task(func(): _task_result = GeoVisibility.viewshed(pkg, eye, r, th, res, k))
+	var m := query_mask
+	_task = WorkerThreadPool.add_task(func(): _task_result = GeoVisibility.viewshed(pkg, eye, r, th, res, k, m))
 
 
 ## Computes the viewshed and waits for it (stalls the frame).
@@ -181,14 +185,14 @@ func _process(delta: float) -> void:
 	if hit.get("hit", false):
 		target = hit.position
 		var t := target + Vector3(0.0, target_height, 0.0)
-		los = terrain.line_of_sight(_eye(), t, _refraction())
+		los = terrain.line_of_sight(_eye(), t, _refraction(), query_mask)
 	_draw()
 	_update_info()
 
 
 func _cursor_hit() -> Dictionary:
 	var mouse := get_viewport().get_mouse_position()
-	return terrain.raycast(camera.project_ray_origin(mouse), camera.project_ray_normal(mouse))
+	return terrain.raycast(camera.project_ray_origin(mouse), camera.project_ray_normal(mouse), 1.0e7, query_mask)
 
 
 func _draw() -> void:
@@ -304,6 +308,7 @@ func _screenshot(dir: String) -> String:
 
 func _check(report_path: String, out_dir: String) -> void:
 	_checking = true
+	query_mask = GeoVisibility.TERRAIN
 	var report := {"package": terrain.package_path, "radius_m": radius, "observer_height_m": observer_height,
 			"target_height_m": target_height, "resolution": resolution}
 	var problems: PackedStringArray = []
@@ -336,7 +341,7 @@ func _check(report_path: String, out_dir: String) -> void:
 			var h := terrain.height_at(p.x, p.z)
 			if is_nan(h):
 				continue
-			var r := terrain.line_of_sight(eye, Vector3(p.x, h + target_height, p.z), _refraction())
+			var r := terrain.line_of_sight(eye, Vector3(p.x, h + target_height, p.z), _refraction(), query_mask)
 			count += 1
 			if r.visible:
 				visible += 1
@@ -350,14 +355,14 @@ func _check(report_path: String, out_dir: String) -> void:
 	elif float(agree) / count < 0.9:
 		problems.append("viewshed and line of sight disagree")
 	# Raycast down onto the observer's ground point.
-	var ray := terrain.raycast(observer + Vector3(30.0, 1000.0, 0.0), Vector3(-30.0, -1000.0, 0.0))
+	var ray := terrain.raycast(observer + Vector3(30.0, 1000.0, 0.0), Vector3(-30.0, -1000.0, 0.0), 1.0e7, query_mask)
 	report.raycast_error_m = snappedf(ray.position.distance_to(observer), 0.001) if ray.hit else -1.0
 	if not ray.hit or ray.position.distance_to(observer) > 0.01:
 		problems.append("raycast missed the observer's ground point")
 	if not out_dir.is_empty():
 		target = observer + Vector3(radius * 0.45, 0.0, -radius * 0.35)
 		target.y = terrain.height_at(target.x, target.z)
-		los = terrain.line_of_sight(eye, target + Vector3(0.0, target_height, 0.0), _refraction())
+		los = terrain.line_of_sight(eye, target + Vector3(0.0, target_height, 0.0), _refraction(), query_mask)
 		var mid := observer.lerp(target, 0.5)
 		camera.global_position = mid + Vector3(-radius * 0.25, radius * 0.4, radius * 0.75)
 		camera.look_at(mid, Vector3.UP)

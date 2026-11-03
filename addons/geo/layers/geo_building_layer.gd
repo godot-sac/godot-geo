@@ -34,6 +34,7 @@ var buildings_drawn := 0
 var tiles_built := 0
 
 var _tiles := {}  # Vector3i(i, j, lod) -> MeshInstance3D (null when the tile has nothing at that level)
+var _counts := {}  # Vector3i(i, j, 0) -> buildings counted in buildings_drawn
 var _tasks := {}  # Vector3i -> WorkerThreadPool task preparing the arrays
 var _results := {}  # Vector3i -> arrays from a finished task (filled on the worker, read on the main thread)
 var _lock := Mutex.new()
@@ -55,6 +56,7 @@ func _rebuild() -> void:
 		if mi:
 			mi.queue_free()
 	_tiles.clear()
+	_counts.clear()
 	buildings_drawn = 0
 	tiles_built = 0
 	data = null
@@ -104,7 +106,8 @@ func update_view(camera: Vector3) -> void:
 		var mesh: ArrayMesh = _results.get(key)
 		_results.erase(key)
 		_lock.unlock()
-		if data.tile_center(key.x, key.y).distance_to(cam) < _range(key.z) + data.tile_m:
+		# build_all_around() may have built the tile meanwhile.
+		if not _tiles.has(key) and data.tile_center(key.x, key.y).distance_to(cam) < _range(key.z) + data.tile_m:
 			_add_tile(key, mesh)
 		if (Time.get_ticks_usec() - t0) / 1000.0 > build_budget_ms:
 			break
@@ -120,9 +123,10 @@ func _scan(cam: Vector2) -> void:
 		if data.tile_center(key.x, key.y).distance_to(cam) > _range(key.z) + data.tile_m:
 			var mi: MeshInstance3D = _tiles[key]
 			if mi:
-				if key.z == 0:
-					buildings_drawn -= mi.get_meta(&"count", 0)
 				mi.queue_free()
+			if key.z == 0:
+				buildings_drawn -= _counts.get(key, 0)
+				_counts.erase(key)
 			_tiles.erase(key)
 	var todo: Array[Vector3i] = []
 	var c := data.tile_of(cam.x, cam.y)
@@ -182,13 +186,18 @@ func build_all_around(camera: Vector3) -> void:
 	build_budget_ms = budget
 
 
+func _count(key: Vector3i) -> void:
+	_counts[key] = data.tile_count(key.x, key.y)
+	buildings_drawn += _counts[key]
+
+
 func _add_tile(key: Vector3i, mesh: ArrayMesh) -> void:
 	var center := data.tile_center(key.x, key.y)
 	tiles_built += 1
 	if mesh == null:
 		_tiles[key] = null
 		if key.z == 0 and not can_draw():
-			buildings_drawn += data.tile_count(key.x, key.y)  # nothing drawn headless, but the count stays meaningful
+			_count(key)  # nothing drawn headless, but the count stays meaningful
 		return
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
@@ -201,9 +210,7 @@ func _add_tile(key: Vector3i, mesh: ArrayMesh) -> void:
 		mi.visibility_range_end_margin = max_distance * 0.1
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast_shadows \
 				else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		var n := data.tile_count(key.x, key.y)
-		mi.set_meta(&"count", n)
-		buildings_drawn += n
+		_count(key)
 	else:
 		mi.visibility_range_begin = max_distance
 		mi.visibility_range_begin_margin = max_distance * 0.1

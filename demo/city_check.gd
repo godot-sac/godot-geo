@@ -90,6 +90,9 @@ func run_check(report_path: String) -> void:
 				true],
 	]
 	for c: Array in cases:
+		if not ((c[1] as Vector3).is_finite() and (c[2] as Vector3).is_finite()):
+			report.lines_of_sight[c[0]] = {"skipped": "outside the package"}  # e.g. the 3 km test package
+			continue
 		var t0 := Time.get_ticks_usec()
 		var r := terrain.line_of_sight(c[1], c[2])
 		var ms := (Time.get_ticks_usec() - t0) / 1000.0
