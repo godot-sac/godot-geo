@@ -289,7 +289,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F3:
 				show_info = not show_info
 			KEY_F12:
-				_screenshot(OS.get_user_data_dir())
+				_screenshot("user://")
 
 
 func _screenshot(dir: String) -> String:

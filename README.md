@@ -121,7 +121,7 @@ Limits: one package at a time, no streaming; packages are read from the file sys
 - [3D DIS demo](docs/demo-3d.md)
 - [Compatibility](docs/compatibility.md) (tested Godot versions and platforms)
 - [Phase 0 findings](docs/phase0.md) (data sources, vertical datum, renderer comparison)
-- [Plan](PLAN.md) (in Turkish) and [changelog](CHANGELOG.md)
+- [Roadmap](ROADMAP.md) and [changelog](CHANGELOG.md)
 
 ## Development
 ```sh

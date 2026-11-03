@@ -17,8 +17,11 @@ The demo uses the sibling repositories of the workspace; `tools/link_siblings.py
 junctions (git-ignored): `addons/dis`, `addons/milsymbol` and `demo/dis` (the godot-dis demo's scenario, unit mover
 and tactical map, so both demos run the same exercise).
 
+The commands below are PowerShell, run in the folder of the repository named in each line (the workspace holds
+godot-geo, godot-dis and godot-milsymbol side by side); `<godot>` is the Godot 4.7 executable.
+
 ```powershell
-cd path\to\godot-geo
+# in godot-geo
 .\tools\.venv\Scripts\python.exe tools\link_siblings.py
 .\tools\.venv\Scripts\python.exe -I tools\build_terrain.py --lat 41.02 --lon 29.05 --size 60000 --spacing 10 --color-spacing 10 --scene S2A_35TPF_20250722_0_L2A --layers water,landcover,canopy,buildings,roads --water-spacing 10 --out terrain\uskudar
 ```
@@ -30,9 +33,9 @@ is off the terrain and keeps its reported height.
 ## Run
 Blue in 3D, red in the godot-dis 2D demo, civilian traffic from Python (three terminals):
 ```powershell
-cd path\to\godot-geo; & "C:\path\to\godot.exe" --path . res://demo/dis3d.tscn -- --side blue
-cd path\to\godot-dis; & "C:\path\to\godot.exe" --path . res://demo/main.tscn -- --side red
-cd path\to\godot-dis; .\tools\.venv\Scripts\python.exe tools\demo_traffic.py
+<godot> --path . res://demo/dis3d.tscn -- --side blue          # in godot-geo
+<godot> --path . res://demo/main.tscn -- --side red            # in godot-dis
+.\tools\.venv\Scripts\python.exe tools\demo_traffic.py       # in godot-dis
 ```
 ## Keys
 | Key | |
@@ -65,8 +68,8 @@ Options after `--`:
 
 A full self-check, on port 3200 so it does not disturb a running demo (two terminals):
 ```powershell
-cd path\to\godot-dis; .\tools\.venv\Scripts\python.exe tools\demo_traffic.py --port 3200 --start 295 --seconds 90
-cd path\to\godot-geo; & "C:\path\to\godot.exe" --path . res://demo/dis3d.tscn -- --port 3200 --check 60
+.\tools\.venv\Scripts\python.exe tools\demo_traffic.py --port 3200 --start 295 --seconds 90     # in godot-dis
+<godot> --path . res://demo/dis3d.tscn -- --port 3200 --check 60                               # in godot-geo
 ```
 ```
 check: 11 units, 489 samples

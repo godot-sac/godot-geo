@@ -8,7 +8,7 @@ elevation and imagery files you already have, without network access. The result
 ```sh
 # DTED cells (a directory is searched recursively; .dt2 before .dt1 before .dt0), offline hillshade colour
 tools/.venv/Scripts/python -I tools/build_terrain.py --lat 39.93 --lon 32.86 --size 21000 --spacing 30 \
-    --dem D:/data/dted --imagery hillshade --attribution "Elevation: <your notice>" --offline --out terrain/mine
+    --dem data/dted --imagery hillshade --attribution "Elevation: <your notice>" --offline --out terrain/mine
 
 # A GeoTIFF DEM in any CRS plus an orthophoto, gaps in the DEM filled from Copernicus DEM
 tools/.venv/Scripts/python -I tools/build_terrain.py --lat 39.93 --lon 32.86 --size 10000 --spacing 10 \

@@ -1,0 +1,25 @@
+# Roadmap
+
+Where godot-geo is heading after 0.1.0. Nothing here is promised for a date; issues and pull requests that move an
+item forward are welcome.
+
+## Next
+- **Own building and road data:** build the building and road layers from a local OpenStreetMap extract
+  (`.osm.pbf`) or a footprint file instead of Overture Maps, fully offline.
+- **Building collision:** an optional physics patch for buildings around a target, like the terrain's
+  `HeightMapShape3D` patch (today vehicles and aircraft only see the terrain surface).
+- **Bridges:** towers and cables for suspension bridges and deck heights from data where OpenStreetMap has them
+  (today decks follow the ground at the bridge ends, so the Bosphorus bridges sit 10–20 m low).
+- **Media:** an animation of the Üsküdar city view for the README.
+- **Measurements:** a long flight along the Bosphorus in the benchmark; numbers on more GPUs.
+
+## Later
+- Reading DTED / GeoTIFF inside the engine (today a package is built offline by `tools/build_terrain.py`).
+- Streaming of areas larger than one package (several packages, or tiles loaded around the camera).
+- Bathymetry for water areas (e.g. EMODnet), so the sea floor is not flat.
+- Faster visibility queries (C++ / GDExtension) for many sensors per frame.
+- Tested support for Godot 4.3–4.6 and macOS.
+- Using 3D Tiles for Godot alongside a package (shared origin; described in the docs but not tried).
+
+## Known limits
+See [Limits](docs/geo-terrain.md#limits-v01) and the accuracy notes in [city view](docs/city.md).

@@ -16,9 +16,11 @@ with pymap3d.
 
 ## Data (attribution carried by every terrain package and by derived screenshots)
 Packages are not in the repository, except the small test packages `tests/data/ankara_small/` (3.6 × 3.6 km),
-`tests/data/fiji_small/`, `tests/data/norway_small/` and `tests/data/uskudar_small/` (3 × 3 km each), which contain modified Copernicus DEM and
-Sentinel-2 data under the notices below (see their `terrain.json`). Packages built from your own files
-(`--dem`, `--imagery`) carry the notices you pass with `--attribution`.
+`tests/data/fiji_small/`, `tests/data/norway_small/` and `tests/data/uskudar_small/` (3 × 3 km each), which
+contain modified Copernicus DEM and Sentinel-2 data under the notices below (see their `terrain.json`);
+`uskudar_small` also holds the land cover (ESA WorldCover), canopy (ETH) and OpenStreetMap-derived layers, with
+building heights estimated from GHSL, under the notices further down. Packages built from your own files (`--dem`,
+`--imagery`) carry the notices you pass with `--attribution`.
 
 ### Copernicus DEM GLO-30
 Free of charge, commercial use permitted (licence: Copernicus DEM licence, COPDEM-30). Required notice for modified
@@ -48,7 +50,12 @@ layer also holds Microsoft Global ML Building Footprints where OpenStreetMap has
 CDLA-Permissive-2.0; Overture distributes them under ODbL, and they are mixed into one ODbL layer here). This
 applies to `tests/data/uskudar_small/` (those four files) in this repository and to every package built with these
 layers; the other layers keep their own notices, and the code stays MIT. Screenshots and videos of the terrain are
-Produced Works: the credit lines are enough. `docs/city/*.jpg` show them on screen.
+Produced Works: the credit lines are enough. `docs/city/*.jpg` and `docs/demo3d/*.jpg` show them on screen.
+
+What the ODbL asks of anyone who redistributes these files (or a package containing them): keep them under ODbL
+1.0 with the credit above, do not add technical restrictions (such as encryption) to them, and if you change them
+and publish the result, offer the changed database under ODbL as well. The rest of a package (DEM, imagery, land
+cover, canopy) is not affected (collective database), and pictures made from it are Produced Works.
 
 ### ESA WorldCover 10 m 2021 v200 (land cover layer)
 CC BY 4.0. Notice: "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by

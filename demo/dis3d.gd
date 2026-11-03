@@ -417,7 +417,7 @@ func _screenshot() -> void:
 	DirAccess.make_dir_recursive_absolute("user://screenshots")
 	var path := "user://screenshots/dis3d_%s.png" % Time.get_datetime_string_from_system().replace(":", "-")
 	get_viewport().get_texture().get_image().save_png(path)
-	_toast("screenshot " + ProjectSettings.globalize_path(path))
+	_toast("screenshot " + path)  # user:// path: no local folder names on screen or in recordings
 
 
 ## CSV of every unit every SAMPLE_INTERVAL: time, marking, source, position, height above ground, speed, heading
@@ -429,7 +429,7 @@ func _start_log(path: String) -> void:
 	if _log == null:
 		push_error("cannot write log %s" % path)
 		return
-	_log_path = ProjectSettings.globalize_path(path)
+	_log_path = path
 	_log.store_line("t,marking,source,x,y,z,agl,speed,heading_deg,pdu_age")
 	_toast("logging to " + _log_path)
 
@@ -470,7 +470,7 @@ func _finish() -> void:
 		var f := FileAccess.open(_check_path, FileAccess.WRITE)
 		if f:
 			f.store_string(JSON.stringify(_check.to_dict(), "  "))
-			print("report: ", ProjectSettings.globalize_path(_check_path))
+			print("report: ", _check_path)
 		code = 1 if _check.problem_count() > 0 else 0
 	get_tree().quit(code)
 

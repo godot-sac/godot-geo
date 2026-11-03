@@ -3,12 +3,9 @@
 All notable changes to this project are documented here. Versions follow [semver](https://semver.org/).
 
 ## [Unreleased]
-### Fixed
-- `line_of_sight`, `raycast`, `viewshed` and `GeoVisibility.trace` return at once for NaN / infinite inputs (an end
-  point outside the package from `height_at`) instead of looping forever; results carry `error`.
-- Freeing a `GeoTerrain` no longer leaves its internal children as orphans (they were queue-freed outside the tree).
-- Layers create no render resources under the headless display server (dummy renderer errors: "wrong RID",
-  "multimesh is null").
+
+## [0.1.0] - Unreleased
+First release.
 
 ### Added
 - Water layer: `build_terrain.py --layers water [--water-spacing]` rasterises Overture Maps `base/water` polygons
@@ -72,11 +69,7 @@ All notable changes to this project are documented here. Versions follow [semver
   (`--poster`); `tools/make_gif.py` turns Movie Maker frames into a small GIF. `docs/media/`: animation, social
   preview image (1280 × 640), icon.
 
-### Changed
-- Visibility demo: the attribution wraps to the window width instead of being cut off on narrow windows.
-- Sentinel-2 scenes whose true-colour asset is not a public COG (requester-pays JPEG 2000) are skipped; when none is
-  left, Earth Search Collection 1 is searched.
-
-### Fixed
-- `build_terrain.py`: areas spanning two Sentinel-2 tiles stayed partly black (only the first tile's scenes were
-  read); a tile is now skipped once one of its scenes adds nothing.
+- Robustness: visibility queries return at once for NaN / infinite inputs (for example `height_at` of a point outside
+  the package) with an `error` entry; under the headless display server the layers keep their data and queries but
+  create no render resources; Sentinel-2 scenes whose true-colour asset is not a public COG are skipped (Earth
+  Search Collection 1 is searched when none is left), and areas across two Sentinel-2 tiles are filled from both.
