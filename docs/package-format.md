@@ -80,7 +80,12 @@ military areas, underground, outside). With buildings, `height.surface` is `"dtm
 describes the bare-earth approximation; otherwise `height.surface` is `"dsm"` (older packages have no key: DSM).
 Both binary files are little-endian: a header (magic `GGBL` / `GGRD`, version 1, tile size, tile counts, feature
 count), an index of zlib blocks per tile, then the blocks; coordinates are 16-bit integers in 5 cm units from the
-tile centre (Godot axes: x east, z south). The Godot readers are `GeoBuildingData` and `GeoRoadLayer`.
+tile centre (Godot axes: x east, z south). In `buildings.bin` the second header field is `reach`: how many tiles
+beyond its own (the tile of its centroid) a footprint extends into; queries search that far. The Godot readers
+are `GeoBuildingData` and `GeoRoadLayer`; they check the header and index against the package and the file size
+and stop at a record that does not fit, so a damaged file gives an error or fewer features, not a crash.
+All rasters and vectors are placed at the terrain surface point of a sample (its ENU east / north / up), not at
+the point below it on the tangent plane, so imagery and layers line up with the heights and with DIS positions.
 A cell is the `spacing_m` square centred on its sample; the value is the covered share computed with 4 × 4
 supersampling, so sampling it bilinearly and cutting at 0.5 gives the shoreline to a fraction of a cell. Water
 polygons are Overture `base/water` subtypes ocean, lake, pond, reservoir, river, water, canal and stream (swimming
