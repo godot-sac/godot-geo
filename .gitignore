@@ -1,6 +1,8 @@
 # Godot
 .godot/
 *.import
+# GUT scenes refer to its fonts and icons by UID; the UIDs live in these import files
+!addons/gut/**/*.import
 export_presets.cfg
 
 # OS / editors
