@@ -4,7 +4,8 @@ Real-world terrain for Godot 4 from open data (Copernicus DEM, Sentinel-2, ESA W
 own DTED / GeoTIFF files, in a WGS84-based local frame shared with godot-dis (DIS, IEEE 1278.1): water, land cover
 detail, trees, buildings and roads, with line-of-sight and viewshed queries that see them.
 
-> **Status:** in development, not released yet. APIs may change before v0.1.0.
+**Status:** 0.1.0, the first release. Tested with Godot 4.7.2 on Windows and Linux; plans in [ROADMAP.md](ROADMAP.md).
+Part of [Godot SAC](https://github.com/godot-sac): stand-alone add-ons for terrain, military symbology, DIS and flight dynamics that also work together.
 
 ![Line of sight and viewshed on the terrain south-east of Ankara](docs/media/visibility.gif)
 
@@ -61,7 +62,7 @@ rights reserved.</sub>
   your own files or the cache works offline.
 
 ## Installation
-From the [releases page](https://github.com/OWNER/godot-geo/releases):
+From the [releases page](https://github.com/godot-sac/godot-geo/releases):
 - `godot-geo-<version>.zip`: unzip into your project; it contains `addons/geo/`. No plugin needs to be enabled; the
   classes are global.
 - Prebuilt terrain packages, each unzipping to `terrain/<name>/` with an `ATTRIBUTION.txt`:

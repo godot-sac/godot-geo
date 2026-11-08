@@ -57,7 +57,7 @@ def addon_zip(version: str, out: Path) -> Path:
         archive.write(ROOT / "LICENSE", "addons/geo/LICENSE")
         archive.write(ROOT / "THIRD_PARTY_NOTICES.md", "addons/geo/THIRD_PARTY_NOTICES.md")
         archive.writestr("addons/geo/VERSION.txt", f"godot-geo {version} (commit {git_commit()})\n"
-                         "Documentation and changelog: https://github.com/OWNER/godot-geo\n")
+                         "Documentation and changelog: https://github.com/godot-sac/godot-geo\n")
     return target
 
 
