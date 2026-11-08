@@ -32,7 +32,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Download Godot
         run: |
           Z="${{ matrix.godot_zip }}"; R="--retry 5 --retry-all-errors --retry-delay 10"; curl -sSfL $R -o godot.zip "https://downloads.godotengine.org/?version=${GODOT_VERSION}&flavor=stable&slug=${Z#Godot_v${GODOT_VERSION}-stable_}" || curl -sSfL $R -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/$Z"
@@ -48,12 +48,12 @@ jobs:
     name: Package builder tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       # DEM tiles and the geoid grid are downloaded on the first run (public AWS buckets, PROJ CDN).
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             tools/.cache
@@ -73,7 +73,7 @@ jobs:
     needs: [godot, python]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Version
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
@@ -89,7 +89,7 @@ jobs:
         run: |
           python3 tools/check_package.py "build/release/godot-geo-$VERSION.zip" build/release/godot-geo-terrain-samples.zip \
             --godot "godot_bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: godot-geo-${{ env.VERSION }}
           path: |
@@ -104,11 +104,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             tools/.cache
