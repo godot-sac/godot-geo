@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download Godot
         run: |
-          curl -sSfL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/${{ matrix.godot_zip }}"
+          Z="${{ matrix.godot_zip }}"; R="--retry 5 --retry-all-errors --retry-delay 10"; curl -sSfL $R -o godot.zip "https://downloads.godotengine.org/?version=${GODOT_VERSION}&flavor=stable&slug=${Z#Godot_v${GODOT_VERSION}-stable_}" || curl -sSfL $R -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/$Z"
           python -m zipfile -e godot.zip godot_bin
           chmod +x "godot_bin/${{ matrix.godot_exe }}"
           echo "GODOT=$PWD/godot_bin/${{ matrix.godot_exe }}" >> "$GITHUB_ENV"
@@ -82,7 +82,7 @@ jobs:
         run: python3 tools/package_release.py --version "$VERSION"
       - name: Download Godot
         run: |
-          curl -sSfL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          Z="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"; R="--retry 5 --retry-all-errors --retry-delay 10"; curl -sSfL $R -o godot.zip "https://downloads.godotengine.org/?version=${GODOT_VERSION}&flavor=stable&slug=${Z#Godot_v${GODOT_VERSION}-stable_}" || curl -sSfL $R -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/$Z"
           python3 -m zipfile -e godot.zip godot_bin
           chmod +x "godot_bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
       - name: Install into an empty project
