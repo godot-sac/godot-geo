@@ -6,8 +6,6 @@ item forward are welcome.
 ## Next
 - **Own building and road data:** build the building and road layers from a local OpenStreetMap extract
   (`.osm.pbf`) or a footprint file instead of Overture Maps, fully offline.
-- **Building collision:** an optional physics patch for buildings around a target, like the terrain's
-  `HeightMapShape3D` patch (today vehicles and aircraft only see the terrain surface).
 - **Bridges:** towers and deck height for bridges OpenStreetMap does not describe (the Yavuz Sultan Selim bridge);
   cable-stayed bridges.
 - **Media:** an animation of the Üsküdar city view for the README.

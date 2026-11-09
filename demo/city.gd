@@ -5,7 +5,8 @@
 ##   <godot> --path . res://demo/city.tscn -- --check [--report x.json] | --bench x.json   (see city_check.gd)
 ## Package: --package, else res://terrain/uskudar_10km, res://terrain/uskudar, then the Üsküdar test package.
 ## Controls: right mouse + WASD / Q E, Shift = fast, wheel = speed; Tab = bookmark list, 1-9 / 0 = bookmarks,
-## PgUp / PgDn = previous / next, G = drop to 2 m above ground, F = walk, F3 = info, F12 = screenshot (user://).
+## PgUp / PgDn = previous / next, G = drop to 2 m above ground, F = walk (stops at walls), F3 = info,
+## F12 = screenshot (user://).
 extends Node3D
 
 const PACKAGES := ["res://terrain/uskudar_10km", "res://terrain/uskudar", "res://tests/data/uskudar_small"]
@@ -35,6 +36,7 @@ func _ready() -> void:
 	var t0 := Time.get_ticks_msec()
 	terrain.ground_detail = float(_arg(args, "--detail", str(terrain.ground_detail)))
 	var pkg := _arg(args, "--package", "")
+	terrain.collision_buildings = true  # the walker (F) stops at walls
 	for p: String in ([pkg] if not pkg.is_empty() else PACKAGES):
 		if FileAccess.file_exists(p.path_join("terrain.json")):
 			terrain.package_path = p
@@ -191,6 +193,29 @@ func _unhandled_input(event: InputEvent) -> void:
 			print("screenshot: %s" % path.get_file())
 
 
+## Walking: the step from `before` to the camera's new position, shortened where a 0.4 m sphere at eye height would
+## hit a building (GeoTerrain.collision_buildings) or the terrain.
+func _walk_from(before: Vector3) -> void:
+	var step := camera.global_position - before
+	step.y = 0.0
+	camera.global_position = before
+	if step.is_zero_approx():
+		return
+	var sphere := SphereShape3D.new()
+	sphere.radius = 0.4
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = sphere
+	q.transform = Transform3D(Basis.IDENTITY, before)
+	q.motion = step
+	var safe := get_world_3d().direct_space_state.cast_motion(q)
+	if safe.size() != 2 or safe[0] >= 1.0:
+		camera.global_position = before + step
+		return
+	# Stop 10 cm short of the wall: a sphere left touching it (within the physics margin) would pass through on the
+	# next step.
+	camera.global_position = before + step.normalized() * maxf(step.length() * safe[0] - 0.1, 0.0)
+
+
 func _drop_to_ground() -> void:
 	var p := camera.global_position
 	var h := terrain.height_at(p.x, p.z)
@@ -206,8 +231,10 @@ func _process(delta: float) -> void:
 		float(Input.is_key_pressed(KEY_E)) - float(Input.is_key_pressed(KEY_Q)),
 		float(Input.is_key_pressed(KEY_S)) - float(Input.is_key_pressed(KEY_W)))
 	var mult := 5.0 if Input.is_key_pressed(KEY_SHIFT) else 1.0
+	var before := camera.global_position
 	camera.translate(dir * _speed * mult * delta)
 	if walking:
+		_walk_from(before)
 		_drop_to_ground()
 	if not info.visible:
 		return

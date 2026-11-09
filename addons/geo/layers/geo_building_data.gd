@@ -318,6 +318,46 @@ func buildings_in(rect: Rect2) -> Array:
 	return out
 
 
+## Triangles (ConcavePolygonShape3D faces, relative to `center` x / z; y in the package frame) of the buildings whose
+## bounding box meets `rect`: each building as the block the visibility queries use, walls from `foundation` below
+## its base (or from its lower edge for parts that start above the ground) up to top_of(), closed by a flat top and,
+## for raised parts, a flat bottom. Thread-safe. Returns {faces: PackedVector3Array, buildings: int}.
+func collision_faces(rect: Rect2, center: Vector2, foundation := 2.0) -> Dictionary:
+	var faces := PackedVector3Array()
+	var n_buildings := 0
+	for bld: Dictionary in buildings_in(rect):
+		var top := top_of(bld)
+		var bottom: float = bld.base + bld.min_height if bld.min_height > 0.0 else bld.base - foundation
+		if not (top > bottom):
+			continue
+		n_buildings += 1
+		var rings: Array = bld.rings
+		var flat := PackedVector2Array()  # every ring's vertices in order, as tris indexes them
+		for ring: PackedVector2Array in rings:
+			var m := ring.size()
+			for k in m:
+				var p := ring[k] - center
+				var q := ring[(k + 1) % m] - center
+				var p0 := Vector3(p.x, bottom, p.y)
+				var q0 := Vector3(q.x, bottom, q.y)
+				var p1 := Vector3(p.x, top, p.y)
+				var q1 := Vector3(q.x, top, q.y)
+				faces.append_array([p0, q0, q1, p0, q1, p1])
+				flat.append(p)
+		var tris: PackedInt32Array = bld.tris
+		if tris.is_empty():
+			tris = Geometry2D.triangulate_polygon(rings[0])  # outline only; holes are rare without a triangulation
+			flat = (rings[0] as PackedVector2Array).duplicate()
+			for k in flat.size():
+				flat[k] -= center
+		for k in range(0, tris.size() - 2, 3):
+			for y: float in ([top, bottom] if bld.min_height > 0.0 else [top]):
+				for i in 3:
+					var v := flat[tris[k + i]]
+					faces.append(Vector3(v.x, y, v.y))
+	return {"faces": faces, "buildings": n_buildings}
+
+
 ## The building whose footprint contains package-frame x, z (its Dictionary), or an empty one.
 func building_at(x: float, z: float) -> Dictionary:
 	var ti := tile_of(x, z)

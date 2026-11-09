@@ -89,9 +89,10 @@ block gets a similar height. Every height added to OpenStreetMap (`height` or `b
 time a package is built.
 
 **Walking around.** `F` puts the camera on the ground; the whole 10 km package (roughly Kadıköy to Beylerbeyi,
-Harem to the east of Çamlıca) can be walked. Buildings have no collision yet, so the walker passes through walls;
-`height_at`, the terrain collision and the visibility queries do see the ground, and `line_of_sight`, `raycast`
-and `viewshed` also see buildings and tree crowns.
+Harem to the east of Çamlıca) can be walked. The demo turns on `collision_buildings`, so the walker stops at
+walls (a 0.4 m sphere at eye height, `PhysicsDirectSpaceState3D.cast_motion`; 198 of 201 automated walks into
+buildings stopped, the other three are on the Çamlıca slope where the approximate ground under the building rises
+to its roof). Tree crowns have no collision; `line_of_sight`, `raycast` and `viewshed` see buildings and trees.
 
 In short: from 100–500 m above the ground the area is recognisable and good enough for simulation and line of
 sight work; at street level the layout is right, the heights and looks of single buildings are approximate.

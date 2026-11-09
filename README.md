@@ -50,7 +50,8 @@ rights reserved.</sub>
 - **Visibility:** `line_of_sight(a, b)` (visible, first obstruction and what it is: terrain, building or tree,
   clearance, optional refraction), `raycast(from, dir)`, `viewshed(observer, radius)` as an image, `set_overlay` to
   show it on the terrain ([details](docs/geo-terrain.md#visibility-queries)).
-- **Collision:** a `HeightMapShape3D` patch that follows the camera or a given node.
+- **Collision:** a `HeightMapShape3D` patch that follows the camera or a given node; optionally the buildings
+  around it as one concave shape (the same blocks the visibility queries use).
 - **godot-dis integration:** alignment with `DisGeoOrigin`; `DisEntityManager.ground_path` places remote land
   entities on the terrain.
 

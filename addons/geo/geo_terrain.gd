@@ -54,6 +54,13 @@ const LAYER_TYPES: Array[Script] = [preload("res://addons/geo/layers/geo_buildin
 ## Node the collision patch follows; the active camera if empty.
 @export var collision_target: NodePath
 @export_flags_3d_physics var collision_layer := 1
+## Also collide with buildings: one ConcavePolygonShape3D of the buildings around the target, as the blocks the
+## visibility queries use (footprint up to the walls plus half the roof). Needs the package's buildings layer;
+## independent of GeoBuildingLayer, so it works on a headless server too.
+@export var collision_buildings := false
+## Edge length of the square kept around the target for building collision, in metres (a dense city has a few
+## thousand buildings per square kilometre; the shape is rebuilt on a worker thread when the target moves on).
+@export var building_collision_size := 600.0
 @export_group("")
 ## Check SHA-256 of the package files on load (slow for large packages).
 @export var verify_package := false
@@ -70,6 +77,12 @@ var _backend: GeoTerrainBackend
 var _body: StaticBody3D
 var _shape: HeightMapShape3D
 var _collision_center := Vector2(INF, INF)
+## Buildings in the current building collision shape.
+var building_collision_count := 0
+var _bld_body: StaticBody3D
+var _bld_center := Vector2(INF, INF)  # centre of the shape in use or being built
+var _bld_task := -1
+var _bld_result := {}  # written by the worker task, read after it finished
 
 
 func _ready() -> void:
@@ -109,6 +122,16 @@ func load_package() -> Error:
 		cs.shape = _shape
 		_body.add_child(cs)
 		add_child(_body, false, INTERNAL_MODE_FRONT)
+		if collision_buildings and package.buildings_data() != null:
+			_bld_body = StaticBody3D.new()
+			_bld_body.name = "BuildingCollision"
+			_bld_body.collision_layer = collision_layer
+			var bcs := CollisionShape3D.new()
+			var shape := ConcavePolygonShape3D.new()
+			shape.backface_collision = true
+			bcs.shape = shape
+			_bld_body.add_child(bcs)
+			add_child(_bld_body, false, INTERNAL_MODE_FRONT)
 	_setup_layers()
 	loaded.emit()
 	_update(true)
@@ -150,12 +173,17 @@ func _clear() -> void:
 	# Leaving the tree does not clear anything; the internal children are freed with this node.
 	for l in layers():  # first: it waits for the layers' worker tasks, which still read the backend
 		l.setup(null)
-	for n: Node in [_backend, _body]:
+	_wait_building_task()
+	_bld_result = {}
+	for n: Node in [_backend, _body, _bld_body]:
 		if n:
 			remove_child(n)
 			n.free()
 	_backend = null
 	_body = null
+	_bld_body = null
+	_bld_center = Vector2(INF, INF)
+	building_collision_count = 0
 	_shape = null
 	package = null
 	origin_offset = 0.0
@@ -181,7 +209,16 @@ func _update(force: bool) -> void:
 	if _body:
 		var target := get_node_or_null(collision_target) as Node3D if not collision_target.is_empty() else cam
 		if target:
-			_update_collision(to_local(target.global_position), force)
+			var local := to_local(target.global_position)
+			_update_collision(local, force)
+			if _bld_body:
+				_update_building_collision(local, force)
+
+
+## Moves the collision patches to the target now, building collision included (after placing a vehicle far away;
+## otherwise they follow by themselves, buildings within a few frames).
+func update_collision_now() -> void:
+	_update(true)
 
 
 func _camera() -> Camera3D:
@@ -390,3 +427,46 @@ func _update_collision(target: Vector3, force: bool) -> void:
 	var cs := _body.get_child(0) as CollisionShape3D
 	var mid := pkg.grid_to_local(c0 + n * 0.5, r0 + n * 0.5)
 	cs.transform = Transform3D(Basis.from_scale(Vector3.ONE * pkg.spacing), Vector3(mid.x, origin_offset, mid.y))
+
+
+func _update_building_collision(target: Vector3, force: bool) -> void:
+	if _bld_task >= 0:
+		if not force and not WorkerThreadPool.is_task_completed(_bld_task):
+			return
+		_wait_building_task()
+		_apply_building_result()
+	var center := Vector2(target.x, target.z)
+	if not force and center.distance_to(_bld_center) < building_collision_size * 0.25:
+		return
+	_bld_center = center
+	var data := package.buildings_data()
+	var half := Vector2.ONE * building_collision_size * 0.5
+	var rect := Rect2(center - half, half * 2.0)
+	var build := func() -> void: _bld_result = data.collision_faces(rect, center).merged({"center": center})
+	if force:
+		build.call()
+		_apply_building_result()
+	else:
+		_bld_task = WorkerThreadPool.add_task(build, false, "GeoTerrain building collision")
+
+
+func _wait_building_task() -> void:
+	if _bld_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_bld_task)
+		_bld_task = -1
+
+
+func _apply_building_result() -> void:
+	if _bld_result.is_empty() or _bld_body == null:
+		return
+	var cs := _bld_body.get_child(0) as CollisionShape3D
+	(cs.shape as ConcavePolygonShape3D).set_faces(_bld_result.faces)
+	var c: Vector2 = _bld_result.center
+	cs.position = Vector3(c.x, origin_offset, c.y)
+	building_collision_count = _bld_result.buildings
+	_bld_result = {}
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_wait_building_task()  # the task writes into this object

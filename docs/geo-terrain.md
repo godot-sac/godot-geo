@@ -6,7 +6,9 @@ height queries and keeps a collision patch under a target. Pure GDScript; Godot 
 ```
 GeoTerrain                 loading, queries, collision, alignment with DisGeoOrigin
 ├── Backend (internal)     GeoTerrainBackend: draws the grid (first backend: GeoCdlodBackend)
-└── Collision (internal)   StaticBody3D + HeightMapShape3D around the target
+├── Collision (internal)   StaticBody3D + HeightMapShape3D around the target
+└── BuildingCollision      StaticBody3D + ConcavePolygonShape3D of the buildings around the target
+    (internal, optional)
 ```
 
 ## Properties
@@ -23,12 +25,33 @@ GeoTerrain                 loading, queries, collision, alignment with DisGeoOri
 | `collision_size` | 2000 | edge of the square collision patch, metres; it follows the target |
 | `collision_target` | — | node the patch follows; the active camera if empty |
 | `collision_layer` | 1 | |
+| `collision_buildings` | false | also collide with buildings around the target (needs the package's buildings layer), see [Building collision](#building-collision) |
+| `building_collision_size` | 600 | edge of the square of buildings kept around the target, metres |
 | `verify_package` | false | check SHA-256 of the package files on load |
+
+
+## Building collision
+With `collision_buildings` on, GeoTerrain keeps a second static body with one `ConcavePolygonShape3D` of the
+buildings within `building_collision_size` of the collision target (the active camera if `collision_target` is
+empty), on the same `collision_layer`. Each building is the block the visibility queries use: its footprint (holes
+included) from 2 m below its base, or from its lower edge for parts that start above the ground, up to the walls
+plus half the roof, with a flat top. So a physics ray, `raycast()` and `line_of_sight()` agree; roof shapes, domes
+and towers' tapering are not modelled. The data comes from the package (`GeoTerrainPackage.buildings_data()`), so
+it works without a `GeoBuildingLayer` and on a headless server.
+
+When the target has moved a quarter of the square, the shape is rebuilt on a worker thread and swapped in a few
+frames later; `update_collision_now()` does it at once. Measured on the Üsküdar packages (Ryzen 9 7950X): a 600 m
+square holds 175–510 buildings (2 900–6 600 triangles), built in 3–12 ms on the worker and set in 1–3 ms on the
+main thread; 1 000 m: up to 1 200 buildings, 25 ms and 7 ms. Bodies moving step by step (a walker, a
+`move_and_collide` loop) should stop a few centimetres short of a wall: a shape left touching it can pass through
+on the next step. On steep slopes the approximate bare ground under a building can rise to its roof level, so
+something kept a fixed height above the ground can pass over it (`docs/city.md`).
 
 ## Methods
 | Method | |
 |---|---|
 | `load_package() -> Error` | (re)loads `package_path`; `ERR_FILE_NOT_FOUND` / `ERR_INVALID_DATA` on failure, with an engine error |
+| `update_collision_now()` | moves the collision patches (terrain and buildings) to the target at once, e.g. after placing a vehicle far away |
 | `height_at(x, z) -> float` | global surface height; `NAN` outside the package |
 | `geodetic_height(lat, lon) -> float` | WGS84 ellipsoidal height of the ground; `NAN` outside |
 | `geodetic_to_global(lat, lon, h) -> Vector3` / `global_to_geodetic(p)` | positions in the terrain's frame |
@@ -246,7 +269,8 @@ nodes ([stats](phase2/stats.json), [views](phase2/views_sheet.jpg)).
 - Close to the ground the picture is limited by the data (30 m DEM, 10 m imagery); the land cover detail textures
   and the 3D layers hide it at the scale of a street, not of a doorway.
 - Building heights are mostly estimates (see [Layers](#layers)); roof shapes are guessed for untagged buildings.
-  Buildings and trees have no collision shapes; only the visibility queries see them.
+  Trees have no collision shapes; buildings have one when `collision_buildings` is on (a block per building, see
+  [Building collision](#building-collision)).
   Bridge decks follow the ground at the bridge ends, unless the bridge's OpenStreetMap outline gives a height: then
   the part over water is at that height (the 15 Temmuz and Fatih Sultan Mehmet bridges, 64–65 m). Suspension bridges
   whose towers are mapped get towers, main cables and hangers generated from those heights (`tools/bridges.py`);

@@ -3,6 +3,11 @@
 All notable changes to this project are documented here. Versions follow [semver](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- Building collision: `GeoTerrain.collision_buildings` (off by default) keeps a `ConcavePolygonShape3D` of the
+  buildings within `building_collision_size` (600 m) of the collision target, as the blocks the visibility queries
+  use; rebuilt on a worker thread as the target moves, `update_collision_now()` for a jump. Works headless.
+  `GeoBuildingData.collision_faces()`. The city demo's walker (F) stops at walls.
 ### Documentation
 - Exported games tested with Godot 4.7.2 release templates on Windows and Linux (docs/compatibility.md).
 
