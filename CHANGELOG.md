@@ -3,6 +3,8 @@
 All notable changes to this project are documented here. Versions follow [semver](https://semver.org/).
 
 ## [Unreleased]
+### Documentation
+- Exported games tested with Godot 4.7.2 release templates on Windows and Linux (docs/compatibility.md).
 
 ## [0.2.0] - 2026-11-09
 ### Added

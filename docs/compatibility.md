@@ -20,7 +20,10 @@ platform Godot runs on.
 
 Exported games: packages are read from the file system (`FileAccess`, `Image.load_from_file`), and `terrain/` is
 excluded from import by `.gdignore`, so the export does not contain them. Ship the package folder next to the
-executable and set `package_path` to its absolute path. Not tested yet in an exported build.
+executable with the same relative path: in an exported game a `res://` path that is not in the `.pck` is looked up
+in the executable's folder, so `package_path = "res://terrain/<name>"` keeps working (an absolute path works too).
+Tested with Godot 4.7.2 release templates on Windows and Linux (2026-11-09, release zip 0.1.0, buildings, trees,
+roads, line of sight; in godot-sim-demo, see godot-sim-demo's [export guide](https://github.com/godot-sac/godot-sim-demo/blob/main/docs/export.md)).
 
 ## Package builder (`tools/build_terrain.py`)
 | godot-geo | Python | Platform | Tested | Result |
