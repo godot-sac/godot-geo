@@ -227,3 +227,33 @@ func test_building_tile_mesh() -> void:
 const TREES_TOTAL := 6468
 const TREE0_X := -1495.313
 const TREE0_Z := -1498.152
+
+
+func test_suspension_bridge_structures_build_a_mesh() -> void:
+	var t := _terrain()
+	var roads: GeoRoadLayer = null
+	for l in t.layers():
+		if l is GeoRoadLayer:
+			roads = l
+	assert_not_null(roads)
+	var meta: Dictionary = roads.package.meta.roads
+	var saved: Variant = meta.get("structures")
+	meta["structures"] = {
+		"towers": [{"x": 0.0, "z": 0.0, "ux": 1.0, "uz": 0.0, "half_width": 13.5, "base": -5.0, "top": 155.0,
+			"beams": [[120.0, 125.0], [152.0, 155.0]]}],
+		"cables": [{"points": [[-100.0, 66.0, 13.5], [0.0, 153.0, 13.5], [100.0, 66.0, 13.5]], "radius": 0.45}],
+		"hangers": [[-50.0, 13.5, 65.0, 88.0], [50.0, 13.5, 65.0, 88.0]],
+	}
+	roads._build_structures()
+	assert_eq([roads.towers, roads.cables, roads.hangers], [1, 1, 2])
+	var node := roads.get_node_or_null("BridgeStructures") as MeshInstance3D
+	assert_not_null(node, "one mesh for all structures")
+	if node:
+		var aabb := node.mesh.get_aabb()
+		assert_almost_eq(aabb.end.y, 155.0, 0.01, "tower top")
+		assert_almost_eq(aabb.position.y, -5.0, 0.01, "tower base")
+		assert_gt(aabb.size.z, 27.0, "two legs 27 m apart")
+	if saved == null:
+		meta.erase("structures")
+	else:
+		meta["structures"] = saved

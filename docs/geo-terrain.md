@@ -154,7 +154,7 @@ the package frame and stream around the camera; heavy work runs on `WorkerThread
 |---|---|---|
 | ground detail (CDLOD shader) | `landcover.png` (ESA WorldCover) | per class a detail texture and normal (own procedural set, 8 slices, `tools/make_detail_textures.py`) modulates the imagery out to 1.5 km; in built-up areas with 3D buildings the imagery (mostly roofs) is pulled towards street tones out to 4 km |
 | `GeoBuildingLayer` | `buildings.bin` | per 500 m tile: up to `max_distance` (4 km) every building, walls with windows from the shader, flat / hipped / gabled / pyramidal roofs, domes; beyond, to `far_distance` (12 km), buildings ≥ `far_min_height` (20 m) as flat blocks |
-| `GeoRoadLayer` | `roads.bin` | roads painted by Godot's 2D renderer into two textures around the camera (2 km at 1 m / px, 8 km at 4 m / px; asphalt, pavement, rail) and blended by the terrain shader; bridge decks as meshes; tunnels not drawn |
+| `GeoRoadLayer` | `roads.bin` | roads painted by Godot's 2D renderer into two textures around the camera (2 km at 1 m / px, 8 km at 4 m / px; asphalt, pavement, rail) and blended by the terrain shader; bridge decks as meshes, towers and cables of suspension bridges (`towers`, `cables`, `hangers` counts); tunnels not drawn |
 | `GeoTreeLayer` | `landcover.png`, `canopy.png`, `footprints.png` | deterministic placement per 10 m sample (tree class: `density` trees; elsewhere one where the canopy is ≥ 3 m), none on water or buildings; 3D low-poly trees to 600 m, impostor cards to 3 km |
 
 Under the headless display server (`--headless`: tests, servers, CI) the layers create no meshes, MultiMeshes or
@@ -247,5 +247,7 @@ nodes ([stats](phase2/stats.json), [views](phase2/views_sheet.jpg)).
   and the 3D layers hide it at the scale of a street, not of a doorway.
 - Building heights are mostly estimates (see [Layers](#layers)); roof shapes are guessed for untagged buildings.
   Buildings and trees have no collision shapes; only the visibility queries see them.
-  Bridge decks follow the ground at the bridge ends: the Bosphorus bridges sit 10–20 m lower than reality and have
-  no towers or cables.
+  Bridge decks follow the ground at the bridge ends, unless the bridge's OpenStreetMap outline gives a height: then
+  the part over water is at that height (the 15 Temmuz and Fatih Sultan Mehmet bridges, 64–65 m). Suspension bridges
+  whose towers are mapped get towers, main cables and hangers generated from those heights (`tools/bridges.py`);
+  the Yavuz Sultan Selim bridge has neither in OpenStreetMap and is a deck only.

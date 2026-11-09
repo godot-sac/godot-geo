@@ -5,6 +5,9 @@ bridge / tunnel flags change (Overture gives flags for fractions of a segment), 
 `MAX_PIECE_M` and filed under the tile of their midpoint. Tunnels are kept but flagged (the renderer skips them).
 Bridge pieces carry a deck height per vertex: the ground at the two ends of the whole bridge (+0.5 m), linear in
 between, never less than 5 m above the ground below, and level at the higher end where the bridge crosses water.
+Where the bridge's OpenStreetMap outline gives a height (tools/bridges.py), the part over water is at that height
+above the water, with ramps to the ends. terrain.json's roads entry also holds the generated towers, cables and
+hangers of suspension bridges ("structures", tools/bridges.py).
 
 File `roads.bin` (little-endian), tiles like buildings.bin:
   header   "GGRD" u16 version=1 u16 reserved f32 tile_m u16 tiles_x u16 tiles_z u32 count
@@ -23,6 +26,7 @@ import numpy as np
 import shapely
 import shapely.ops
 
+import bridges as geo_bridges
 import layers
 
 TILE_M = 500.0
@@ -89,6 +93,8 @@ def build_roads(grid, ground: np.ndarray, water_layer, bounds, release, cache, n
         r = np.clip(np.round((grid.half - np.asarray(nn)) / ws).astype(int), 0, wn - 1)
         return water.image[r, c] >= 128
 
+    outlines = geo_bridges.load(grid, bounds, release, cache, network, log)
+
     half = grid.half - 1.0
     clip = shapely.box(-half, -half, half, half)
     records = []
@@ -112,9 +118,18 @@ def build_roads(grid, ground: np.ndarray, water_layer, bounds, release, cache, n
                 d = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(c, axis=0), axis=1))])
                 h0, h1 = gr[0] + 0.5, gr[-1] + 0.5
                 deck = h0 + (h1 - h0) * d / max(d[-1], 1e-6)
-                dense = np.asarray([piece.interpolate(s).coords[0] for s in np.arange(0.0, piece.length, 20.0)])
-                if water_at(dense[:, 0], dense[:, 1]).any():
+                steps = np.arange(0.0, piece.length, 20.0)
+                dense = np.asarray([piece.interpolate(s).coords[0] for s in steps])
+                wet = water_at(dense[:, 0], dense[:, 1])
+                if wet.any():
                     deck = np.full_like(deck, max(h0, h1))
+                    outline = outlines.outline_at(piece.interpolate(0.5, normalized=True))
+                    if outline is not None:
+                        # Mapped deck height above the water, with ramps to the bridge ends on land.
+                        top = float(np.median(ground_at(dense[wet, 0], dense[wet, 1]))) + outline["height"]
+                        w0, w1 = float(steps[wet][0]), float(steps[wet][-1])
+                        if top > max(h0, h1) and w1 > w0:
+                            deck = np.interp(d, [0.0, w0, w1, d[-1]], [h0, top, top, h1])
                 deck = np.maximum(deck, gr + 5.0 * (d > 0) * (d < d[-1]))
             clipped = piece.intersection(clip)
             if clipped.is_empty:
@@ -146,9 +161,13 @@ def build_roads(grid, ground: np.ndarray, water_layer, bounds, release, cache, n
     bridges = sum(1 for x in records if x[1] & BRIDGE)
     log(f"  roads: {len(records)} pieces ({bridges} bridge), classes {dict(sorted(counts.items()))}")
     data, tiles = encode(records, grid)
+    structures = geo_bridges.structures(outlines, ground_at)
+    log(f"  bridge structures: {len(structures['towers'])} towers, {len(structures['cables'])} cables, "
+        f"{len(structures['hangers'])} hangers")
     meta = {
         "encoding": "godot-geo roads v1 (see tools/roads.py): zlib tiles of polylines with class, flags, width "
                     "and bridge deck heights; package frame",
+        "structures": structures,
         "tile_m": TILE_M, "tiles": tiles, "count": len(records), "bridges": bridges,
         "source": {"product": "Overture Maps transportation segments (OpenStreetMap)", "release": release,
                    "access": f"s3://{layers.OVERTURE_BUCKET}/release/{release}/theme=transportation"},

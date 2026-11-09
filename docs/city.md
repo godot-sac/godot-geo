@@ -75,7 +75,7 @@ The packages are built only from open data, without surveying anything by hand. 
 | | Source | Fidelity |
 |---|---|---|
 | Building positions and outlines | OpenStreetMap, Overture Maps (incl. Microsoft ML footprints) | traced from aerial imagery: blocks, streets and squares are where they are on a map |
-| Roads, bridges, shoreline | OpenStreetMap | as mapped; road surfaces are painted on the ground (no kerbs, pavement edges or street furniture) |
+| Roads, bridges, shoreline | OpenStreetMap | as mapped; road surfaces are painted on the ground (no kerbs, pavement edges or street furniture); suspension bridge towers and cables are generated from the mapped tower and deck heights, a simplified shape |
 | Ground shape | Copernicus DEM 30 m, resampled to 5 m | hills, slopes and valleys are right; steps, retaining walls and cuttings narrower than ~30 m are not there |
 | Building heights | OSM `height` / `building:levels` for ~8 %, GHSL 100 m average for ~91 % | the skyline of a neighbourhood is close; a single building can be several floors off (see below) |
 | Building look | own procedural walls, windows and roofs | a landmark is recognisable by position and mass, not by facade or signage |

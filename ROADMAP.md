@@ -8,8 +8,8 @@ item forward are welcome.
   (`.osm.pbf`) or a footprint file instead of Overture Maps, fully offline.
 - **Building collision:** an optional physics patch for buildings around a target, like the terrain's
   `HeightMapShape3D` patch (today vehicles and aircraft only see the terrain surface).
-- **Bridges:** towers and cables for suspension bridges and deck heights from data where OpenStreetMap has them
-  (today decks follow the ground at the bridge ends, so the Bosphorus bridges sit 10–20 m low).
+- **Bridges:** towers and deck height for bridges OpenStreetMap does not describe (the Yavuz Sultan Selim bridge);
+  cable-stayed bridges.
 - **Media:** an animation of the Üsküdar city view for the README.
 - **Measurements:** a long flight along the Bosphorus in the benchmark; numbers on more GPUs.
 

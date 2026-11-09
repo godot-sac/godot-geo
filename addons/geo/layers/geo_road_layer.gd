@@ -6,7 +6,9 @@
 ## textures ("rings": near 2 km at 1 m per pixel, far 8 km at 4 m per pixel; red = asphalt, green = pavement,
 ## blue = rail) and the terrain shader blends them into the ground colour. A ring is repainted when the camera has
 ## moved an eighth of its size. Near the camera residential streets get pavements on both sides.
-## Bridges are meshes: a deck at the heights stored in the package, with concrete sides. Tunnels are not drawn.
+## Bridges are meshes: a deck at the heights stored in the package, with concrete sides, and for suspension bridges
+## the towers, main cables and hangers the package describes (terrain.json roads.structures, tools/bridges.py).
+## Tunnels are not drawn.
 class_name GeoRoadLayer
 extends GeoTerrainLayer
 
@@ -29,6 +31,10 @@ var tiles_x := 0
 var tiles_z := 0
 var count := 0
 var bridges := 0
+## Towers, cables and hangers drawn (suspension bridges).
+var towers := 0
+var cables := 0
+var hangers := 0
 var _file: FileAccess
 var _index := PackedInt64Array()
 var _tiles := {}
@@ -37,6 +43,7 @@ var _viewports: Array[SubViewport] = []
 var _painters: Array[_Painter] = []
 var _centers: Array[Vector2] = [Vector2(INF, INF), Vector2(INF, INF)]
 var _bridge_node: MeshInstance3D
+var _structure_node: MeshInstance3D
 
 
 func has_data() -> bool:
@@ -54,6 +61,9 @@ func _rebuild() -> void:
 	if _bridge_node:
 		_bridge_node.queue_free()
 		_bridge_node = null
+	if _structure_node:
+		_structure_node.queue_free()
+		_structure_node = null
 	if not has_data():
 		return
 	var err := _open(GeoTerrainPackage._global(package.path.path_join(package.meta.roads.file)))
@@ -79,6 +89,7 @@ func _rebuild() -> void:
 		_painters.append(p)
 	if draw_bridges:
 		_build_bridges()
+		_build_structures()
 
 
 func _open(file: String) -> String:
@@ -238,6 +249,85 @@ func _build_bridges() -> void:
 	_bridge_node.mesh = st.commit()
 	_bridge_node.material_override = mat
 	add_child(_bridge_node)
+
+
+## Towers, main cables and hangers of suspension bridges from terrain.json (roads.structures).
+func _build_structures() -> void:
+	towers = 0
+	cables = 0
+	hangers = 0
+	var data: Dictionary = package.meta.roads.get("structures", {})
+	if data.is_empty():
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var steel := Color(0.70, 0.71, 0.72).srgb_to_linear()
+	var cable_color := Color(0.30, 0.31, 0.33).srgb_to_linear()
+	for t: Dictionary in data.get("towers", []):
+		var c := Vector3(t.x, 0.0, t.z)
+		var u := Vector3(t.ux, 0.0, t.uz).normalized()
+		var v := Vector3(-u.z, 0.0, u.x)
+		var hw: float = t.half_width
+		for side in [-1.0, 1.0]:
+			_box(st, c + v * hw * side, u, v, 3.5, 2.5, t.base, t.top, steel)  # leg, 7 x 5 m
+		for beam: Array in t.get("beams", []):
+			_box(st, c, u, v, 2.5, hw, beam[0], beam[1], steel)
+		towers += 1
+	for cable: Dictionary in data.get("cables", []):
+		var pts: Array = cable.points
+		var r: float = cable.get("radius", 0.45)
+		for k in pts.size() - 1:
+			_tube(st, Vector3(pts[k][0], pts[k][1], pts[k][2]), Vector3(pts[k + 1][0], pts[k + 1][1], pts[k + 1][2]),
+					r, cable_color)
+		cables += 1
+	for h: Array in data.get("hangers", []):
+		_tube(st, Vector3(h[0], h[2], h[1]), Vector3(h[0], h[3], h[1]), 0.15, cable_color)
+		hangers += 1
+	if towers + cables + hangers == 0:
+		return
+	st.generate_normals()
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 0.6
+	mat.metallic = 0.3
+	_structure_node = MeshInstance3D.new()
+	_structure_node.name = "BridgeStructures"
+	_structure_node.mesh = st.commit()
+	_structure_node.material_override = mat
+	add_child(_structure_node)
+
+
+## A box around the vertical line through `center`: half sizes `hu` along `u` and `hv` along `v`, from y0 to y1.
+static func _box(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3, hu: float, hv: float, y0: float, y1: float,
+		col: Color) -> void:
+	var c := [center - u * hu - v * hv, center + u * hu - v * hv, center + u * hu + v * hv, center - u * hu + v * hv]
+	var lo: Array[Vector3] = []
+	var hi: Array[Vector3] = []
+	for p: Vector3 in c:
+		lo.append(Vector3(p.x, y0, p.z))
+		hi.append(Vector3(p.x, y1, p.z))
+	for k in 4:
+		var n := (lo[k] + lo[(k + 1) % 4]) * 0.5 - Vector3(center.x, y0, center.z)
+		_quad(st, lo[k], lo[(k + 1) % 4], hi[(k + 1) % 4], hi[k], n, col)
+	_quad(st, hi[0], hi[1], hi[2], hi[3], Vector3.UP, col)
+	_quad(st, lo[0], lo[1], lo[2], lo[3], Vector3.DOWN, col)
+
+
+## A square tube of half width `r` from `a` to `b`.
+static func _tube(st: SurfaceTool, a: Vector3, b: Vector3, r: float, col: Color) -> void:
+	var d := b - a
+	if d.length() < 0.01:
+		return
+	var side := d.cross(Vector3.UP)
+	if side.length() < 0.001:
+		side = d.cross(Vector3.RIGHT)
+	side = side.normalized() * r
+	var up := side.cross(d).normalized() * r
+	var ring := [side + up, side - up, -side - up, -side + up]
+	for k in 4:
+		var p0: Vector3 = ring[k]
+		var p1: Vector3 = ring[(k + 1) % 4]
+		_quad(st, a + p0, a + p1, b + p1, b + p0, (p0 + p1) * 0.5, col)
 
 
 static func _deck(st: SurfaceTool, pts: PackedVector2Array, deck: PackedFloat32Array, width: float) -> void:

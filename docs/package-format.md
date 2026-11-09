@@ -13,7 +13,7 @@ A package is a directory written by `tools/build_terrain.py` and read by Godot w
 | `canopy.png` | Optional (`canopy`): L8, tree canopy height in quarter metres (ETH Global Canopy Height 2020). |
 | `buildings.bin` | Optional (`buildings`): building footprints, heights, roofs, colours (format in `tools/buildings.py`). |
 | `footprints.png` | With `buildings`: L8 on the height grid, 255 where a footprint touches the sample's cell. |
-| `roads.bin` | Optional (`roads`): road and rail polylines with class, width, bridge / tunnel flags and deck heights (format in `tools/roads.py`). |
+| `roads.bin` | Optional (`roads`): road and rail polylines with class, width, bridge / tunnel flags and deck heights (format in `tools/roads.py`). The `roads` entry of `terrain.json` also holds `structures`: suspension bridge `towers` (centre, span direction, cable plane half width, base and top height, cross beams), `cables` (polylines, x / y / z) and `hangers` (x, z, bottom, top), package frame, from `tools/bridges.py`. |
 
 ## Grid and frame
 Both rasters are square grids centred on the origin, `size_m` wide, sampled at their own `spacing_m`

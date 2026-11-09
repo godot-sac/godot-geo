@@ -82,13 +82,16 @@ def _boxes(bounds: tuple[float, float, float, float]) -> list[tuple[float, float
     return [(lon_min, lat_min, lon_max, lat_max)]
 
 
-def overture_table(theme: str, kind: str, bounds, columns: list[str], release: str, cache: Path, network, log):
-    """Rows of Overture `theme/type=kind` whose bbox meets `bounds` (lat_min, lat_max, lon_min, lon_max).
-    Returns (pyarrow.Table, cache file)."""
+def overture_table(theme: str, kind: str, bounds, columns: list[str], release: str, cache: Path, network, log,
+                   subtype: str | None = None):
+    """Rows of Overture `theme/type=kind` whose bbox meets `bounds` (lat_min, lat_max, lon_min, lon_max), only those
+    of `subtype` if given. Returns (pyarrow.Table, cache file)."""
     import pyarrow as pa
     import pyarrow.parquet as pq
 
     key = f"{release}|{theme}|{kind}|{','.join(f'{b:.6f}' for b in bounds)}|{','.join(columns)}"
+    if subtype:
+        key += f"|subtype={subtype}"
     path = cache / "overture" / release / f"{theme}-{kind}-{hashlib.sha256(key.encode()).hexdigest()[:16]}.parquet"
     if path.exists():
         return pq.read_table(path), path
@@ -105,6 +108,8 @@ def overture_table(theme: str, kind: str, bounds, columns: list[str], release: s
         log(f"  reading Overture {theme}/{kind} {x0:.3f}..{x1:.3f} E, {y0:.3f}..{y1:.3f} N")
         f = ((pc.field("bbox", "xmin") < x1) & (pc.field("bbox", "xmax") > x0)
              & (pc.field("bbox", "ymin") < y1) & (pc.field("bbox", "ymax") > y0))
+        if subtype:
+            f = f & (pc.field("subtype") == subtype)
         tables.append(data.to_table(columns=columns, filter=f))
     table = pa.concat_tables(tables)
     path.parent.mkdir(parents=True, exist_ok=True)
