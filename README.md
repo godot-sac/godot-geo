@@ -4,6 +4,8 @@ Real-world terrain for Godot 4 from open data (Copernicus DEM, Sentinel-2, ESA W
 own DTED / GeoTIFF files, in a WGS84-based local frame shared with godot-dis (DIS, IEEE 1278.1): water, land cover
 detail, trees, buildings and roads, with line-of-sight and viewshed queries that see them.
 
+[![CI](https://github.com/godot-sac/godot-geo/actions/workflows/ci.yml/badge.svg)](https://github.com/godot-sac/godot-geo/actions/workflows/ci.yml)
+
 **Status:** 0.2.0. Tested with Godot 4.7.2 on Windows and Linux; plans in [ROADMAP.md](ROADMAP.md).
 Part of [Godot SAC](https://github.com/godot-sac): stand-alone add-ons for terrain, military symbology, DIS and flight dynamics that also work together.
 
