@@ -34,7 +34,7 @@ height at its `x, z` (when the scene origin equals the package origin). Between 
 {
   "format": "godot-geo-terrain",
   "format_version": 1,
-  "generator": "godot-geo tools/build_terrain.py 0.1.0",
+  "generator": "godot-geo tools/build_terrain.py 0.2.0",
   "created": "2026-10-31T15:33:41+00:00",
   "origin": {"latitude": 39.9334, "longitude": 32.8597, "height": 0.0},
   "frame": "...",

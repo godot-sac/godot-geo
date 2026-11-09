@@ -47,7 +47,7 @@ import buildings as geo_buildings  # noqa: E402
 import roads as geo_roads  # noqa: E402
 import layers as geo_layers  # noqa: E402
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 PACKAGE_FORMAT = "godot-geo-terrain"
 PACKAGE_FORMAT_VERSION = 1
 

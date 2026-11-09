@@ -3,6 +3,8 @@
 All notable changes to this project are documented here. Versions follow [semver](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-11-09
 ### Added
 - Bridges from OpenStreetMap's bridge outlines and supports (Overture `base/infrastructure`, `tools/bridges.py`): a
   deck over water at the mapped height (the Bosphorus bridges were 10–20 m low), and towers, main cables and hangers
