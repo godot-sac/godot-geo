@@ -1,5 +1,6 @@
 numpy==2.5.4
 OpenEXR==3.5.3
+osmium==4.3.2
 pillow==13.0.0
 pyarrow==26.0.0
 pymap3d==3.2.0

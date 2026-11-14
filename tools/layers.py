@@ -3,7 +3,8 @@ package's ENU grid. Each layer returns a `Layer` (key in terrain.json, file name
 
 Vector data comes from Overture Maps GeoParquet on its public S3 bucket (anonymous, no account), read with pyarrow
 with a bounding-box filter so only the row groups of the area are fetched. The rows read are cached in
-tools/.cache/overture/<release>/ so a rebuild, or --offline, needs no network.
+tools/.cache/overture/<release>/ so a rebuild, or --offline, needs no network. With `--osm-pbf FILE`
+(use_osm_pbf()) the same tables come from a local OpenStreetMap extract instead (tools/osm_pbf.py), fully offline.
 
 water   Overture base/water polygons (from OpenStreetMap: coastline-derived ocean, lakes, rivers, reservoirs),
         rasterised with 4x4 supersampling into a coverage mask (255 = water). Licence of the result: ODbL 1.0.
@@ -25,6 +26,9 @@ OVERTURE_BUCKET = "overturemaps-us-west-2"
 OVERTURE_REGION = "us-west-2"
 OSM_ATTRIBUTION = ("© OpenStreetMap contributors, Overture Maps Foundation "
                    "(ODbL 1.0, https://www.openstreetmap.org/copyright)")
+OSM_ONLY_ATTRIBUTION = "© OpenStreetMap contributors (ODbL 1.0, https://www.openstreetmap.org/copyright)"
+LICENSE_OVERTURE = "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)"
+LICENSE_OSM = "ODbL-1.0 (derived from OpenStreetMap)"
 
 # Polygon subtypes of base/water drawn as water. Left out: human_made (swimming pools, fountains: they sit on roofs
 # and courtyards, not on the terrain surface) and physical (named sea / strait areas, not shorelines).
@@ -38,6 +42,33 @@ WGS84 = pymap3d.Ellipsoid.from_name("wgs84")
 # is the surface point (e, n, u), whose latitude / longitude differ from those of (e, n, 0) by about u * d / R
 # (metres on high ground far from the origin), so rasters are sampled and vectors projected at the surface.
 _surface = None  # (grid, heights) or None
+_osm = None  # osm_pbf.OsmExtract when --osm-pbf is given
+
+
+def use_osm_pbf(path, cache: Path, log) -> None:
+    """Take the vector layers from a local OpenStreetMap extract instead of Overture Maps (None: Overture)."""
+    global _osm
+    if path is None:
+        _osm = None
+        return
+    import osm_pbf
+    _osm = osm_pbf.OsmExtract(Path(path), cache, log)
+
+
+def vector_source(theme: str, product: str, release: str) -> dict:
+    """`source` metadata of a vector layer: the Overture theme, or the OpenStreetMap extract."""
+    if _osm is not None:
+        return _osm.describe()
+    return {"product": product, "release": release,
+            "access": f"s3://{OVERTURE_BUCKET}/release/{release}/theme={theme}"}
+
+
+def attribution() -> str:
+    return OSM_ONLY_ATTRIBUTION if _osm is not None else OSM_ATTRIBUTION
+
+
+def license_text() -> str:
+    return LICENSE_OSM if _osm is not None else LICENSE_OVERTURE
 
 
 def set_surface(grid, heights) -> None:
@@ -85,7 +116,9 @@ def _boxes(bounds: tuple[float, float, float, float]) -> list[tuple[float, float
 def overture_table(theme: str, kind: str, bounds, columns: list[str], release: str, cache: Path, network, log,
                    subtype: str | None = None):
     """Rows of Overture `theme/type=kind` whose bbox meets `bounds` (lat_min, lat_max, lon_min, lon_max), only those
-    of `subtype` if given. Returns (pyarrow.Table, cache file)."""
+    of `subtype` if given. Returns (pyarrow.Table, cache file). From the OpenStreetMap extract with --osm-pbf."""
+    if _osm is not None:
+        return _osm.table(theme, kind, bounds, columns, subtype)
     import pyarrow as pa
     import pyarrow.parquet as pq
 
@@ -313,13 +346,12 @@ def build_water(grid, bounds, release: str, cache: Path, network, log, sha256_fi
     meta = {
         "encoding": "PNG L8, share of the cell covered by water (255 = all water), rows north to south",
         "samples": grid.count, "spacing_m": grid.spacing,
-        "source": {"product": "Overture Maps base/water (OpenStreetMap)", "release": release,
-                   "access": f"s3://{OVERTURE_BUCKET}/release/{release}/theme=base/type=water",
-                   "subtypes": counts, "rows_sha256": sha256_file(path)},
-        "license": "ODbL-1.0 (derived from OpenStreetMap)",
+        "source": vector_source("base/type=water", "Overture Maps base/water (OpenStreetMap)", release)
+        | {"subtypes": counts, "rows_sha256": sha256_file(path)},
+        "license": license_text(),
         "water_share": share,
     }
-    return Layer("water", "water.png", image, meta, [OSM_ATTRIBUTION])
+    return Layer("water", "water.png", image, meta, [attribution()])
 
 
 def build_layers(names: list[str], grid_for, bounds, release: str, cache: Path, network, log, sha256_file

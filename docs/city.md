@@ -22,7 +22,8 @@ tools/.venv/Scripts/python.exe -I tools/build_terrain.py --lat 41.02 --lon 29.05
 
 The first run downloads (no account, no key): Copernicus DEM tiles, a Sentinel-2 window, an ESA WorldCover and an
 ETH canopy height window, a GHSL building height window, and the Overture Maps rows of the area (water, land use,
-buildings, building parts, transportation; read from Overture's public bucket with pyarrow). Everything is cached
+buildings, building parts, transportation; read from Overture's public bucket with pyarrow, or from a local
+OpenStreetMap extract with `--osm-pbf`, see [own data](own-data.md)). Everything is cached
 in `tools/.cache/`; later runs and `--offline` need no network. The 10 km package takes about 3 minutes the first
 time and 30 s from the cache; heights 5 m (from the 30 m DEM), colour 10 m, water mask 2.5 m.
 

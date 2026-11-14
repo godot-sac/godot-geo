@@ -50,10 +50,43 @@ The two geoids differ by up to a few metres; using none where one is needed puts
   elevation tint, computed from the package heights. Useful offline and for checking a DEM.
 - Without `--imagery`, Sentinel-2 L2A is downloaded as before.
 
+## Vector layers from an OpenStreetMap extract (`--osm-pbf`)
+The water, buildings and roads layers (with bridges) read Overture Maps by default. With `--osm-pbf FILE` they read
+an OpenStreetMap extract instead: a country or region file from a mirror such as Geofabrik, or one cut from your
+own OpenStreetMap database. The file is read with pyosmium (in `tools/requirements.txt`), without the network.
+
+```sh
+tools/.venv/Scripts/python -I tools/build_terrain.py --lat 41.02 --lon 29.05 --size 10000 --spacing 5     --color-spacing 10 --layers water,landcover,canopy,buildings,roads --water-spacing 2.5     --osm-pbf data/turkey-latest.osm.pbf --out terrain/mine
+```
+
+`tools/osm_pbf.py` turns the extract into the same tables the layers read from Overture, so everything after that
+(rasterising, heights, roofs, the ground model, bridges) is the same code:
+
+| Layer | OpenStreetMap features |
+|---|---|
+| water | `natural=water` (subtype from `water=*`), `landuse=reservoir` / `basin`, `waterway=riverbank`; the sea from `natural=coastline` lines (the faces of the package box on the coastline's right-hand side, since OpenStreetMap keeps the land on the left). Pools and fountains are left out. |
+| buildings | `building=*` areas with `height`, `min_height`, `building:levels`, `building:min_level`, `roof:shape`, `roof:height`, `roof:colour`, `building:colour`, `location=underground`; `building:part=*` areas linked to the building that contains them. Anything inside `landuse=military` / `military=*` is left out, as with Overture. |
+| roads | `highway=*` (links as their road class; proposed, under construction, platforms and corridors left out) and `railway=rail` / `light_rail` / `subway` / `tram` / `narrow_gauge` / `monorail` / `funicular` lines; `bridge`, `tunnel` and `width` tags. |
+| bridges | `man_made=bridge` areas (`height`, `bridge:structure`) and `bridge:support=*` areas, for the deck heights and suspension bridge towers |
+
+The extract is read once per package box (objects near the box, so ways that start outside are seen) and cached
+as Parquet in `tools/.cache/osm/`; the other layers and later builds take the cache. The land cover, canopy and
+GHSL building height rasters are still downloaded once (or taken from the cache), so for a fully offline build
+copy `tools/.cache/` from a machine that built the area before, or leave out `landcover` and `canopy`.
+
+Compared with Overture Maps on the Üsküdar 10 km package (Geofabrik Turkey extract of 2026-11-14, Overture
+2026-10-21.0): reading the whole Turkey extract (654 MB) takes 3.5 min, a rebuild from the cache 25 s. The water
+mask covers the same 20.8 % of the area, the bridges are the same (86 outlines, the 15 Temmuz towers), road lengths
+per class agree within 3 % (primary roads 5 %) except where Overture keeps roads under construction (classed `unknown`, 257 km against
+17 km) and railways under construction (215 against 92 km of rail). There are fewer buildings, 68 900 against
+84 800: Overture adds Microsoft machine-learned footprints where OpenStreetMap has none, so blocks that are not
+mapped in OpenStreetMap stay empty. Underground railways carry OpenStreetMap's `tunnel=yes` and are not painted on
+the surface. Without coastlines in the box (an inland area) there is no sea, only the mapped lakes and rivers.
+
 ## Attribution
 Packages carry the notices their data requires in `terrain.json` (`attribution`), and `GeoTerrain.attribution()`
 returns them for display. Copernicus notices are added only when Copernicus data was actually used (including as a
-fallback). For your own files, pass the notice your licence requires with `--attribution "..."` (repeatable); the
+fallback). Layers from `--osm-pbf` carry "© OpenStreetMap contributors (ODbL 1.0)" instead of the Overture notice. For your own files, pass the notice your licence requires with `--attribution "..."` (repeatable); the
 builder reminds you when it is missing. `terrain.json` stores file names and SHA-256 hashes, never paths.
 
 ## Offline machines

@@ -1,7 +1,8 @@
 # Third-Party Notices
 
 Entries are added when third-party code or data is copied into this repository or shipped in a terrain package.
-Development-time tools (rasterio/GDAL, numpy, pyproj/PROJ, pymap3d, Pillow, OpenEXR, pytest) are listed in `tools/requirements.txt`;
+Development-time tools (rasterio/GDAL, numpy, pyproj/PROJ, pymap3d, Pillow, OpenEXR, pyarrow, shapely, pyosmium/libosmium,
+pytest) are listed in `tools/requirements.txt`;
 their code is not included.
 
 ## Included

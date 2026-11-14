@@ -4,8 +4,7 @@ Where godot-geo is heading after 0.1.0. Nothing here is promised for a date; iss
 item forward are welcome.
 
 ## Next
-- **Own building and road data:** build the building and road layers from a local OpenStreetMap extract
-  (`.osm.pbf`) or a footprint file instead of Overture Maps, fully offline.
+- **Own footprint files:** buildings from a footprint file (GeoPackage, Shapefile) besides OpenStreetMap extracts.
 - **Bridges:** towers and deck height for bridges OpenStreetMap does not describe (the Yavuz Sultan Selim bridge);
   cable-stayed bridges.
 - **Media:** an animation of the Üsküdar city view for the README.

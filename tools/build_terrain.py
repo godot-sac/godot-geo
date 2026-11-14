@@ -1034,6 +1034,7 @@ def build(args: argparse.Namespace) -> dict:
     extra = []
     surface, ground_model = "dsm", None
     if args.layers:
+        geo_layers.use_osm_pbf(args.osm_pbf, CACHE, log)
         layer_grids = {"water": Grid(args.lat, args.lon, args.origin_height, args.size,
                                      args.water_spacing or color_grid.spacing),
                        "landcover": color_grid, "canopy": color_grid}
@@ -1107,6 +1108,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="spacing of the water mask (m, default = colour spacing); finer gives a sharper shoreline")
     g.add_argument("--overture-release", default=geo_layers.OVERTURE_RELEASE,
                    help=f"Overture Maps release to read (default {geo_layers.OVERTURE_RELEASE})")
+    g.add_argument("--osm-pbf", metavar="FILE",
+                   help="take water, buildings, roads and bridges from this OpenStreetMap extract (.osm.pbf, e.g. "
+                        "from Geofabrik) instead of Overture Maps; read offline with pyosmium, cached")
     ap.add_argument("--attribution", action="append", metavar="TEXT",
                     help="notice required by your data's licence (repeatable); stored in terrain.json")
     ap.add_argument("--offline", action="store_true", help="fail instead of using the network (cached data is fine)")

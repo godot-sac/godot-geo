@@ -59,10 +59,12 @@ rights reserved.</sub>
 - Godot 4.7 (the addon uses engine APIs available since 4.3, untested there). Tested on Windows and Linux with the
   Forward+, Mobile and Compatibility renderers; macOS not yet. Details: [compatibility table](docs/compatibility.md).
 - For building packages: Python 3.12+ and the packages in `tools/requirements.txt` (rasterio, pyproj, pymap3d,
-  numpy, OpenEXR, Pillow, pyarrow, shapely). These are build-time tools only; nothing of them is in the addon.
+  numpy, OpenEXR, Pillow, pyarrow, shapely, pyosmium). These are build-time tools only; nothing of them is in the
+  addon.
   Downloading open data uses public buckets and servers without an account or key (Copernicus DEM, Earth Search,
   ESA WorldCover, Overture Maps, ETH canopy height, GHSL, the PROJ CDN); downloads are cached, and building from
-  your own files or the cache works offline.
+  your own files or the cache works offline; buildings, roads and water can also come from a local OpenStreetMap
+  extract (`--osm-pbf`, [own data](docs/own-data.md#vector-layers-from-an-openstreetmap-extract---osm-pbf)).
 
 ## Installation
 From the [releases page](https://github.com/godot-sac/godot-geo/releases):

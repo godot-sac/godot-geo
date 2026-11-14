@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Versions follow [semver
 
 ## [Unreleased]
 ### Added
+- `build_terrain.py --osm-pbf FILE`: the water, buildings and roads layers (with bridges) from a local
+  OpenStreetMap extract instead of Overture Maps, offline (`tools/osm_pbf.py`, pyosmium; sea from coastlines;
+  cached). On the Üsküdar 10 km package the water and bridges match Overture and road lengths per class agree within 3 % (primary 5 %);
+  buildings lack Overture's Microsoft ML footprints. See docs/own-data.md.
 - Building collision: `GeoTerrain.collision_buildings` (off by default) keeps a `ConcavePolygonShape3D` of the
   buildings within `building_collision_size` (600 m) of the collision target, as the blocks the visibility queries
   use; rebuilt on a worker thread as the target moves, `update_collision_now()` for a jump. Works headless.

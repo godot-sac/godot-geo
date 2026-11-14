@@ -380,16 +380,16 @@ def build_buildings(grid, dsm: np.ndarray, canopy_layer, bounds, release, cache,
                     "roof shape, colours and roof triangles; positions in the package frame",
         "tile_m": TILE_M, "tiles": tiles, "count": len(records), "height_sources": shares,
         "dropped": stats,
-        "source": {"product": "Overture Maps buildings (OpenStreetMap; Microsoft ML footprints where OSM has none)",
-                   "release": release, "access": f"s3://{layers.OVERTURE_BUCKET}/release/{release}/theme=buildings",
-                   "height_hint": "GHS-BUILT-H R2023A ANBH 2018 (100 m)" if ghsl is not None else None},
-        "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)",
+        "source": layers.vector_source(
+            "buildings", "Overture Maps buildings (OpenStreetMap; Microsoft ML footprints where OSM has none)", release)
+        | {"height_hint": "GHS-BUILT-H R2023A ANBH 2018 (100 m)" if ghsl is not None else None},
+        "license": layers.license_text(),
     }
-    attribution = [layers.OSM_ATTRIBUTION] + ([GHSL_ATTRIBUTION] if ghsl is not None else [])
+    attribution = [layers.attribution()] + ([GHSL_ATTRIBUTION] if ghsl is not None else [])
     layer = layers.Layer("buildings", "buildings.bin", None, meta, attribution, data=data)
     fp = layers.Layer("footprints", "footprints.png", np.where(labels > 0, 255, 0).astype(np.uint8), {
         "encoding": "PNG L8, 255 where a building footprint touches the height sample's cell, else 0",
-        "samples": n, "spacing_m": grid.spacing, "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)"})
+        "samples": n, "spacing_m": grid.spacing, "license": layers.license_text()})
     ground_stats = {"removed_median_m": float(np.median(removed)) if removed.size else 0.0,
                     "removed_p90_m": float(np.percentile(removed, 90)) if removed.size else 0.0}
     return ground, [layer, fp], ground_stats

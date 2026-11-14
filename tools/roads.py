@@ -169,11 +169,11 @@ def build_roads(grid, ground: np.ndarray, water_layer, bounds, release, cache, n
                     "and bridge deck heights; package frame",
         "structures": structures,
         "tile_m": TILE_M, "tiles": tiles, "count": len(records), "bridges": bridges,
-        "source": {"product": "Overture Maps transportation segments (OpenStreetMap)", "release": release,
-                   "access": f"s3://{layers.OVERTURE_BUCKET}/release/{release}/theme=transportation"},
-        "license": "ODbL-1.0 (derived from OpenStreetMap via Overture Maps)",
+        "source": layers.vector_source("transportation", "Overture Maps transportation segments (OpenStreetMap)",
+                                       release),
+        "license": layers.license_text(),
     }
-    return layers.Layer("roads", "roads.bin", None, meta, [layers.OSM_ATTRIBUTION], data=data)
+    return layers.Layer("roads", "roads.bin", None, meta, [layers.attribution()], data=data)
 
 
 def encode(records, grid) -> tuple[bytes, dict]:
